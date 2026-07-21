@@ -1,0 +1,10 @@
+ProductId,ProductName,Category,UnitPrice,IsActive
+PROD-001,Widget Alpha,Widgets,29.99,true
+PROD-002,Widget Beta,Widgets,49.99,true
+PROD-003,Gadget Pro,Gadgets,99.99,true
+PROD-004,Gadget Lite,Gadgets,59.99,true
+PROD-005,Connector X,Connectors,14.99,true
+PROD-006,Connector Y,Connectors,19.99,true
+PROD-007,Sensor Mark IV,Sensors,149.99,true
+PROD-008,Legacy Adapter,Adapters,9.99,false
+PROD-009,Discontinued Hub,Hubs,199.99,false

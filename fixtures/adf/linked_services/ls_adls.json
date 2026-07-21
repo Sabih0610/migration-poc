@@ -1,0 +1,10 @@
+{
+  "name": "ls_adls",
+  "properties": {
+    "type": "AzureBlobFS",
+    "typeProperties": {
+      "url": "https://migrationpocstorage.dfs.core.windows.net"
+    },
+    "description": "Azure Data Lake Storage Gen2 for migration POC raw and curated zones."
+  }
+}

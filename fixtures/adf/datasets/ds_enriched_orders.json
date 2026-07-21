@@ -1,0 +1,19 @@
+{
+  "name": "ds_enriched_orders",
+  "properties": {
+    "type": "Parquet",
+    "linkedServiceName": {
+      "referenceName": "ls_adls",
+      "type": "LinkedServiceReference"
+    },
+    "typeProperties": {
+      "location": {
+        "type": "AzureBlobFSLocation",
+        "folderPath": "curated/enriched_orders",
+        "fileSystem": "data"
+      },
+      "compressionCodec": "snappy"
+    },
+    "description": "Curated enriched orders output in Parquet format."
+  }
+}

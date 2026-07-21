@@ -1,0 +1,28 @@
+{
+  "name": "ds_customers",
+  "properties": {
+    "type": "DelimitedText",
+    "linkedServiceName": {
+      "referenceName": "ls_adls",
+      "type": "LinkedServiceReference"
+    },
+    "typeProperties": {
+      "location": {
+        "type": "AzureBlobFSLocation",
+        "folderPath": "raw/master",
+        "fileName": "customers.csv",
+        "fileSystem": "data"
+      },
+      "columnDelimiter": ",",
+      "firstRowAsHeader": true,
+      "quoteChar": "\""
+    },
+    "description": "Source customers CSV in ADLS raw zone.",
+    "schema": [
+      { "name": "CustomerId", "type": "String" },
+      { "name": "CustomerName", "type": "String" },
+      { "name": "Region", "type": "String" },
+      { "name": "IsActive", "type": "String" }
+    ]
+  }
+}

@@ -1,0 +1,142 @@
+{
+  "name": "df_sales_processing_legacy",
+  "properties": {
+    "type": "MappingDataFlow",
+    "typeProperties": {
+      "sources": [
+        {
+          "name": "SourceOrders",
+          "description": "Read orders CSV from raw zone.",
+          "dataset": {
+            "referenceName": "ds_orders",
+            "type": "DatasetReference"
+          }
+        },
+        {
+          "name": "SourceCustomers",
+          "description": "Read customers CSV from raw zone.",
+          "dataset": {
+            "referenceName": "ds_customers",
+            "type": "DatasetReference"
+          }
+        },
+        {
+          "name": "SourceProducts",
+          "description": "Read products CSV from raw zone.",
+          "dataset": {
+            "referenceName": "ds_products",
+            "type": "DatasetReference"
+          }
+        }
+      ],
+      "sinks": [
+        {
+          "name": "SinkEnrichedOrders",
+          "description": "Write enriched valid orders to curated zone.",
+          "dataset": {
+            "referenceName": "ds_enriched_orders",
+            "type": "DatasetReference"
+          }
+        },
+        {
+          "name": "SinkRejectedOrders",
+          "description": "Write rejected orders for manual review.",
+          "dataset": {
+            "referenceName": "ds_rejected_orders",
+            "type": "DatasetReference"
+          }
+        },
+        {
+          "name": "SinkCustomerSummary",
+          "description": "Write aggregated customer summary.",
+          "dataset": {
+            "referenceName": "ds_customer_summary",
+            "type": "DatasetReference"
+          }
+        }
+      ],
+      "transformations": [
+        {
+          "name": "CastOrderTypes",
+          "description": "Cast Quantity to integer and DiscountPercent to decimal."
+        },
+        {
+          "name": "ValidateQuantity",
+          "description": "Filter rows where Quantity is greater than zero."
+        },
+        {
+          "name": "JoinCustomers",
+          "description": "Left outer join orders to customers on CustomerId."
+        },
+        {
+          "name": "JoinProducts",
+          "description": "Left outer join orders to products on ProductId."
+        },
+        {
+          "name": "DerivedColumns",
+          "description": "Calculate GrossAmount, DiscountAmount, and NetAmount."
+        },
+        {
+          "name": "ConditionalSplitValidRejected",
+          "description": "Split into valid orders (customer exists, product active) and rejected orders."
+        },
+        {
+          "name": "AggregateByCustomerRegion",
+          "description": "Aggregate NetAmount by CustomerId, CustomerName, and Region."
+        }
+      ],
+      "scriptLines": [
+        "source(output(",
+        "          OrderId as string,",
+        "          CustomerId as string,",
+        "          ProductId as string,",
+        "          Quantity as string,",
+        "          DiscountPercent as string,",
+        "          OrderDate as string",
+        "     ),",
+        "     allowSchemaDrift: true,",
+        "     validateSchema: false) ~> SourceOrders",
+        "source(output(",
+        "          CustomerId as string,",
+        "          CustomerName as string,",
+        "          Region as string,",
+        "          IsActive as string",
+        "     ),",
+        "     allowSchemaDrift: true,",
+        "     validateSchema: false) ~> SourceCustomers",
+        "source(output(",
+        "          ProductId as string,",
+        "          ProductName as string,",
+        "          Category as string,",
+        "          UnitPrice as string,",
+        "          IsActive as string",
+        "     ),",
+        "     allowSchemaDrift: true,",
+        "     validateSchema: false) ~> SourceProducts",
+        "SourceOrders derive(Quantity = toInteger(Quantity),",
+        "          DiscountPercent = toDecimal(DiscountPercent)) ~> CastOrderTypes",
+        "CastOrderTypes filter(Quantity > 0) ~> ValidateQuantity",
+        "ValidateQuantity, SourceCustomers join(ValidateQuantity@CustomerId == SourceCustomers@CustomerId,",
+        "     joinType: 'left',",
+        "     matchType: 'exact') ~> JoinCustomers",
+        "JoinCustomers, SourceProducts join(JoinCustomers@ProductId == SourceProducts@ProductId,",
+        "     joinType: 'left',",
+        "     matchType: 'exact') ~> JoinProducts",
+        "JoinProducts derive(GrossAmount = Quantity * toDecimal(UnitPrice),",
+        "          DiscountAmount = Quantity * toDecimal(UnitPrice) * DiscountPercent / 100,",
+        "          NetAmount = Quantity * toDecimal(UnitPrice) * (1 - DiscountPercent / 100)) ~> DerivedColumns",
+        "DerivedColumns split(not(isNull(CustomerName)) && SourceProducts@IsActive == 'true',",
+        "     disjoint: true) ~> ConditionalSplitValidRejected@(ValidOrders, RejectedOrders)",
+        "ConditionalSplitValidRejected@ValidOrders aggregate(groupBy(JoinCustomers@CustomerId,",
+        "          CustomerName,",
+        "          Region),",
+        "     TotalNetAmount = sum(NetAmount),",
+        "     OrderCount = count()) ~> AggregateByCustomerRegion",
+        "ConditionalSplitValidRejected@ValidOrders sink(allowSchemaDrift: true) ~> SinkEnrichedOrders",
+        "ConditionalSplitValidRejected@RejectedOrders sink(allowSchemaDrift: true) ~> SinkRejectedOrders",
+        "AggregateByCustomerRegion sink(allowSchemaDrift: true) ~> SinkCustomerSummary"
+      ]
+    },
+    "description": "Legacy sales processing data flow: validates, enriches, splits, and aggregates order data."
+  }
+}

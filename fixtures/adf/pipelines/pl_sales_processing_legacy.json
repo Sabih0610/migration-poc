@@ -1,0 +1,87 @@
+{
+  "name": "pl_sales_processing_legacy",
+  "properties": {
+    "activities": [
+      {
+        "name": "GetOrdersMetadata",
+        "type": "GetMetadata",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "dataset": {
+            "referenceName": "ds_orders",
+            "type": "DatasetReference"
+          },
+          "fieldList": ["exists", "itemName", "lastModified", "size"]
+        }
+      },
+      {
+        "name": "CheckFileExists",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "GetOrdersMetadata",
+            "dependencyConditions": ["Succeeded"]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "value": "@activity('GetOrdersMetadata').output.exists",
+            "type": "Expression"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "ExecuteSalesDataFlow",
+              "type": "ExecuteDataFlow",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "1.00:00:00",
+                "retry": 2,
+                "retryIntervalInSeconds": 60
+              },
+              "typeProperties": {
+                "dataFlow": {
+                  "referenceName": "df_sales_processing_legacy",
+                  "type": "DataFlowReference"
+                },
+                "compute": {
+                  "coreCount": 8,
+                  "computeType": "General"
+                },
+                "traceLevel": "Fine"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "FailMissingFile",
+              "type": "Fail",
+              "dependsOn": [],
+              "typeProperties": {
+                "message": "Orders file does not exist in raw zone.",
+                "errorCode": "FILE_NOT_FOUND"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "parameters": {
+      "RunDate": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "variables": {
+      "ProcessingStatus": {
+        "type": "String",
+        "defaultValue": "pending"
+      }
+    },
+    "description": "Legacy sales processing pipeline: checks for orders file, executes sales data flow if found, fails if missing."
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "ds_rejected_orders",
+  "properties": {
+    "type": "DelimitedText",
+    "linkedServiceName": {
+      "referenceName": "ls_adls",
+      "type": "LinkedServiceReference"
+    },
+    "typeProperties": {
+      "location": {
+        "type": "AzureBlobFSLocation",
+        "folderPath": "curated/rejected_orders",
+        "fileSystem": "data"
+      },
+      "columnDelimiter": ",",
+      "firstRowAsHeader": true,
+      "quoteChar": "\""
+    },
+    "description": "Rejected orders output in CSV for manual review."
+  }
+}

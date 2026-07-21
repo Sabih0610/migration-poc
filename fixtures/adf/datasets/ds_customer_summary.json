@@ -1,0 +1,19 @@
+{
+  "name": "ds_customer_summary",
+  "properties": {
+    "type": "Parquet",
+    "linkedServiceName": {
+      "referenceName": "ls_adls",
+      "type": "LinkedServiceReference"
+    },
+    "typeProperties": {
+      "location": {
+        "type": "AzureBlobFSLocation",
+        "folderPath": "curated/customer_summary",
+        "fileSystem": "data"
+      },
+      "compressionCodec": "snappy"
+    },
+    "description": "Aggregated customer summary output in Parquet format."
+  }
+}

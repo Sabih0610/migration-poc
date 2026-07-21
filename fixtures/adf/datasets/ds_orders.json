@@ -1,0 +1,30 @@
+{
+  "name": "ds_orders",
+  "properties": {
+    "type": "DelimitedText",
+    "linkedServiceName": {
+      "referenceName": "ls_adls",
+      "type": "LinkedServiceReference"
+    },
+    "typeProperties": {
+      "location": {
+        "type": "AzureBlobFSLocation",
+        "folderPath": "raw/sales",
+        "fileName": "orders.csv",
+        "fileSystem": "data"
+      },
+      "columnDelimiter": ",",
+      "firstRowAsHeader": true,
+      "quoteChar": "\""
+    },
+    "description": "Source orders CSV in ADLS raw zone.",
+    "schema": [
+      { "name": "OrderId", "type": "String" },
+      { "name": "CustomerId", "type": "String" },
+      { "name": "ProductId", "type": "String" },
+      { "name": "Quantity", "type": "String" },
+      { "name": "DiscountPercent", "type": "String" },
+      { "name": "OrderDate", "type": "String" }
+    ]
+  }
+}

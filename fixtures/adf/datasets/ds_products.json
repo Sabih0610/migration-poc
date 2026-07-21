@@ -1,0 +1,29 @@
+{
+  "name": "ds_products",
+  "properties": {
+    "type": "DelimitedText",
+    "linkedServiceName": {
+      "referenceName": "ls_adls",
+      "type": "LinkedServiceReference"
+    },
+    "typeProperties": {
+      "location": {
+        "type": "AzureBlobFSLocation",
+        "folderPath": "raw/master",
+        "fileName": "products.csv",
+        "fileSystem": "data"
+      },
+      "columnDelimiter": ",",
+      "firstRowAsHeader": true,
+      "quoteChar": "\""
+    },
+    "description": "Source products CSV in ADLS raw zone.",
+    "schema": [
+      { "name": "ProductId", "type": "String" },
+      { "name": "ProductName", "type": "String" },
+      { "name": "Category", "type": "String" },
+      { "name": "UnitPrice", "type": "String" },
+      { "name": "IsActive", "type": "String" }
+    ]
+  }
+}

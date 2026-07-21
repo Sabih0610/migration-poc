@@ -1,0 +1,9 @@
+CustomerId,CustomerName,Region,IsActive
+CUST-001,Contoso Ltd,North America,true
+CUST-002,Fabrikam Inc,Europe,true
+CUST-003,Northwind Traders,Asia Pacific,true
+CUST-004,Adventure Works,North America,true
+CUST-005,Wide World Importers,Europe,true
+CUST-006,Tailspin Toys,Asia Pacific,true
+CUST-007,Datum Corp,North America,false
+CUST-008,Proseware Inc,Europe,true
