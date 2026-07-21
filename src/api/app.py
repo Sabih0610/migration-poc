@@ -14,6 +14,7 @@ from src.config import get_settings
 from src.database import init_database
 from src.logging_config import configure_logging
 from src.api.routes import router as discovery_router
+from src.api.assessment_routes import router as assessment_router
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ app = FastAPI(
 
 # Register routers
 app.include_router(discovery_router)
+app.include_router(assessment_router)
 
 
 # ── Exception handler ────────────────────────────────────────────

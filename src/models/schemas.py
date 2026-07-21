@@ -9,7 +9,8 @@ No credential fields are defined. Serialization round-trips cleanly.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from enum import Enum
+from typing import Any, Iterable, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -348,3 +349,134 @@ class DiscoveryResult(BaseModel):
     dependencies: list[DependencyEdge] = Field(default_factory=list)
     missing_dependencies: list[MissingDependency] = Field(default_factory=list)
     summary: DiscoverySummary = Field(default_factory=DiscoverySummary)
+
+
+# ── Assessment Models (Phase 4) ─────────────────────────────────
+
+
+class AssessmentStatus(str, Enum):
+    """Compatibility verdict for an asset or issue.
+
+    Ordered from most to least migratable. Overall status is the
+    worst (highest priority) status across all assessed assets.
+    """
+
+    READY = "READY"
+    NEEDS_REVIEW = "NEEDS_REVIEW"
+    REQUIRES_CHANGE = "REQUIRES_CHANGE"
+    UNSUPPORTED = "UNSUPPORTED"
+    BLOCKED = "BLOCKED"
+
+
+class IssueSeverity(str, Enum):
+    """Severity of a single assessment issue."""
+
+    INFO = "INFO"
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+
+# Priority: higher number = worse. BLOCKED dominates, READY is lowest.
+_STATUS_PRIORITY: dict[AssessmentStatus, int] = {
+    AssessmentStatus.READY: 1,
+    AssessmentStatus.NEEDS_REVIEW: 2,
+    AssessmentStatus.REQUIRES_CHANGE: 3,
+    AssessmentStatus.UNSUPPORTED: 4,
+    AssessmentStatus.BLOCKED: 5,
+}
+
+_STATUS_SEVERITY: dict[AssessmentStatus, IssueSeverity] = {
+    AssessmentStatus.READY: IssueSeverity.INFO,
+    AssessmentStatus.NEEDS_REVIEW: IssueSeverity.LOW,
+    AssessmentStatus.REQUIRES_CHANGE: IssueSeverity.MEDIUM,
+    AssessmentStatus.UNSUPPORTED: IssueSeverity.HIGH,
+    AssessmentStatus.BLOCKED: IssueSeverity.CRITICAL,
+}
+
+# Statuses that block automated migration outright.
+_BLOCKING_STATUSES = {AssessmentStatus.BLOCKED, AssessmentStatus.UNSUPPORTED}
+
+
+def status_priority(status: AssessmentStatus) -> int:
+    """Return the priority rank of a status (higher = worse)."""
+    return _STATUS_PRIORITY[AssessmentStatus(status)]
+
+
+def severity_for_status(status: AssessmentStatus) -> IssueSeverity:
+    """Map a status to its default issue severity."""
+    return _STATUS_SEVERITY[AssessmentStatus(status)]
+
+
+def is_blocking(status: AssessmentStatus) -> bool:
+    """True if the status blocks automated migration (BLOCKED/UNSUPPORTED)."""
+    return AssessmentStatus(status) in _BLOCKING_STATUSES
+
+
+def is_manual_review(status: AssessmentStatus) -> bool:
+    """True if the status needs a human to look at it (anything but READY)."""
+    return AssessmentStatus(status) != AssessmentStatus.READY
+
+
+def worst_status(statuses: Iterable[AssessmentStatus]) -> AssessmentStatus:
+    """Return the highest-priority (worst) status; READY if empty."""
+    worst = AssessmentStatus.READY
+    for status in statuses:
+        if status_priority(status) > status_priority(worst):
+            worst = AssessmentStatus(status)
+    return worst
+
+
+class AssessmentIssue(BaseModel):
+    """A single compatibility finding produced by a rule."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    rule_id: str
+    asset_name: str
+    asset_type: str
+    status: AssessmentStatus
+    severity: IssueSeverity
+    message: str
+    recommended_action: str = ""
+    manual_review: bool = False
+    blocking: bool = False
+
+
+class AssetAssessment(BaseModel):
+    """Assessment of a single asset — its worst status and all its issues."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    asset_name: str
+    asset_type: str
+    status: AssessmentStatus
+    issues: list[AssessmentIssue] = Field(default_factory=list)
+
+
+class AssessmentSummary(BaseModel):
+    """Aggregate counts across an assessment run."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    total_assets: int = 0
+    total_issues: int = 0
+    ready_count: int = 0
+    needs_review_count: int = 0
+    requires_change_count: int = 0
+    unsupported_count: int = 0
+    blocked_count: int = 0
+    blocking_issue_count: int = 0
+    manual_review_issue_count: int = 0
+    status_counts: dict[str, int] = Field(default_factory=dict)
+
+
+class AssessmentResult(BaseModel):
+    """Complete output of the compatibility assessment engine."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    overall_status: AssessmentStatus = AssessmentStatus.READY
+    assessments: list[AssetAssessment] = Field(default_factory=list)
+    summary: AssessmentSummary = Field(default_factory=AssessmentSummary)

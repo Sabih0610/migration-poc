@@ -51,6 +51,29 @@ class AppMetadata(Base):
         return f"<AppMetadata(key={self.key!r}, value={self.value!r})>"
 
 
+class AssessmentRun(Base):
+    """Persisted compatibility-assessment run (Phase 4).
+
+    Stores the serialized AssessmentResult as JSON. Never stores
+    credentials — the result models carry none.
+    """
+
+    __tablename__ = "assessment_runs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    overall_status = Column(String(32), nullable=False)
+    result_json = Column(Text, nullable=False)
+
+    def __repr__(self) -> str:
+        return (
+            f"<AssessmentRun(id={self.id}, "
+            f"overall_status={self.overall_status!r})>"
+        )
+
+
 # ── Engine & Session ─────────────────────────────────────────────
 
 _engine = None
