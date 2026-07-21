@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timezone
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     Integer,
@@ -71,6 +72,32 @@ class AssessmentRun(Base):
         return (
             f"<AssessmentRun(id={self.id}, "
             f"overall_status={self.overall_status!r})>"
+        )
+
+
+class MigrationPlanRecord(Base):
+    """Persisted migration plan (Phase 5).
+
+    Versioned per assessment. Stores the serialized MigrationPlan as
+    JSON. Never stores credentials — the plan models carry none.
+    """
+
+    __tablename__ = "migration_plans"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    assessment_id = Column(Integer, nullable=True)
+    version = Column(Integer, nullable=False, default=1)
+    executable = Column(Boolean, nullable=False, default=True)
+    overall_risk = Column(String(32), nullable=False)
+    plan_json = Column(Text, nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<MigrationPlanRecord(id={self.id}, "
+            f"assessment_id={self.assessment_id}, version={self.version})>"
         )
 
 

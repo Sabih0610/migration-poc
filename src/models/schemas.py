@@ -480,3 +480,168 @@ class AssessmentResult(BaseModel):
     overall_status: AssessmentStatus = AssessmentStatus.READY
     assessments: list[AssetAssessment] = Field(default_factory=list)
     summary: AssessmentSummary = Field(default_factory=AssessmentSummary)
+
+
+# ── Migration Planning Models (Phase 5) ─────────────────────────
+
+
+class TargetItemType(str, Enum):
+    """Microsoft Fabric target item types."""
+
+    WORKSPACE = "Workspace"
+    CONNECTION = "FabricConnection"
+    LAKEHOUSE = "Lakehouse"
+    LAKEHOUSE_TABLE = "LakehouseTable"
+    DATAFLOW_GEN2 = "DataflowGen2"
+    DATA_PIPELINE = "FabricDataPipeline"
+    SCHEDULE = "FabricSchedule"
+    NONE = "None"
+
+
+class MigrationActionType(str, Enum):
+    """Ordered deployment step types for a migration plan."""
+
+    VERIFY_WORKSPACE = "verify_workspace"
+    CREATE_CONNECTION = "create_connection"
+    CREATE_LAKEHOUSE = "create_lakehouse"
+    CREATE_TABLE = "create_table"
+    CREATE_DATAFLOW = "create_dataflow"
+    CREATE_PIPELINE = "create_pipeline"
+    CONFIGURE_SCHEDULE = "configure_schedule"
+    RUN_TARGET = "run_target"
+    VALIDATE = "validate"
+
+
+class MigrationRisk(str, Enum):
+    """Risk level of an action or of the overall plan."""
+
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+
+_RISK_PRIORITY: dict[MigrationRisk, int] = {
+    MigrationRisk.LOW: 1,
+    MigrationRisk.MEDIUM: 2,
+    MigrationRisk.HIGH: 3,
+    MigrationRisk.CRITICAL: 4,
+}
+
+_STATUS_RISK: dict[AssessmentStatus, MigrationRisk] = {
+    AssessmentStatus.READY: MigrationRisk.LOW,
+    AssessmentStatus.NEEDS_REVIEW: MigrationRisk.LOW,
+    AssessmentStatus.REQUIRES_CHANGE: MigrationRisk.MEDIUM,
+    AssessmentStatus.UNSUPPORTED: MigrationRisk.HIGH,
+    AssessmentStatus.BLOCKED: MigrationRisk.CRITICAL,
+}
+
+
+def risk_priority(risk: MigrationRisk) -> int:
+    """Return the priority rank of a risk (higher = worse)."""
+    return _RISK_PRIORITY[MigrationRisk(risk)]
+
+
+def risk_for_status(status: AssessmentStatus) -> MigrationRisk:
+    """Map an assessment status to a migration risk level."""
+    return _STATUS_RISK[AssessmentStatus(status)]
+
+
+def worst_risk(risks: Iterable[MigrationRisk]) -> MigrationRisk:
+    """Return the highest-priority (worst) risk; LOW if empty."""
+    worst = MigrationRisk.LOW
+    for risk in risks:
+        if risk_priority(risk) > risk_priority(worst):
+            worst = MigrationRisk(risk)
+    return worst
+
+
+class SourceTargetMapping(BaseModel):
+    """Maps one source ADF asset to its Fabric target (or explains it)."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    source_asset: str
+    source_type: str
+    target_item_type: TargetItemType
+    target_item_name: str
+    assessment_status: AssessmentStatus
+    rule_id: str
+    mapped: bool = True
+    explanation: str = ""
+
+
+class MigrationAction(BaseModel):
+    """A single ordered deployment step in the migration plan."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    order: int
+    action_type: MigrationActionType
+    source_asset: Optional[str] = None
+    source_type: Optional[str] = None
+    target_item_type: TargetItemType
+    target_item_name: str
+    risk: MigrationRisk = MigrationRisk.LOW
+    reason: str = ""
+    approval_required: bool = False
+    automated: bool = True
+    requires_conversion: bool = False
+    warning: Optional[str] = None
+
+
+class ManualAction(BaseModel):
+    """Work that cannot be automated (unsupported or blocked assets)."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    source_asset: str
+    source_type: str
+    reason: str
+    recommended_action: str
+    blocking: bool = False
+
+
+class ValidationRule(BaseModel):
+    """A post-migration validation check comparing source and target."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    name: str
+    rule_type: str
+    source: str
+    target: str
+    comparison: str
+    tolerance: float = 0.0
+    blocking: bool = True
+
+
+class MigrationPlanSummary(BaseModel):
+    """Aggregate counts for a migration plan."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    total_source_assets: int = 0
+    mapped_count: int = 0
+    action_count: int = 0
+    manual_action_count: int = 0
+    validation_rule_count: int = 0
+    executable: bool = True
+    overall_risk: MigrationRisk = MigrationRisk.LOW
+    risk_counts: dict[str, int] = Field(default_factory=dict)
+    target_item_counts: dict[str, int] = Field(default_factory=dict)
+
+
+class MigrationPlan(BaseModel):
+    """Complete Fabric migration plan derived from discovery + assessment."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    executable: bool = True
+    overall_risk: MigrationRisk = MigrationRisk.LOW
+    assessment_status: AssessmentStatus = AssessmentStatus.READY
+    mappings: list[SourceTargetMapping] = Field(default_factory=list)
+    actions: list[MigrationAction] = Field(default_factory=list)
+    manual_actions: list[ManualAction] = Field(default_factory=list)
+    validation_rules: list[ValidationRule] = Field(default_factory=list)
+    summary: MigrationPlanSummary = Field(default_factory=MigrationPlanSummary)
