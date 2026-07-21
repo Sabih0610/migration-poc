@@ -1,0 +1,101 @@
+"""SQLite database foundation using SQLAlchemy.
+
+Creates engine, session factory, and the app_metadata table.
+"""
+
+import logging
+from datetime import datetime, timezone
+
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    create_engine,
+)
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
+from src.config import get_settings
+
+logger = logging.getLogger(__name__)
+
+
+class Base(DeclarativeBase):
+    """Declarative base for all ORM models."""
+    pass
+
+
+class AppMetadata(Base):
+    """Key-value metadata table for application state."""
+
+    __tablename__ = "app_metadata"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    key = Column(String(255), nullable=False)
+    value = Column(Text, nullable=True)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    __table_args__ = (UniqueConstraint("key", name="uq_app_metadata_key"),)
+
+    def __repr__(self) -> str:
+        return f"<AppMetadata(key={self.key!r}, value={self.value!r})>"
+
+
+# ── Engine & Session ─────────────────────────────────────────────
+
+_engine = None
+_SessionLocal = None
+
+
+def get_engine():
+    """Return the SQLAlchemy engine (created on first call)."""
+    global _engine
+    if _engine is None:
+        settings = get_settings()
+        _engine = create_engine(
+            settings.database_url,
+            connect_args={"check_same_thread": False},
+            echo=False,
+        )
+    return _engine
+
+
+def get_session_factory():
+    """Return the session factory (created on first call)."""
+    global _SessionLocal
+    if _SessionLocal is None:
+        _SessionLocal = sessionmaker(
+            autocommit=False, autoflush=False, bind=get_engine()
+        )
+    return _SessionLocal
+
+
+def init_database() -> None:
+    """Create all tables. Safe to call multiple times."""
+    try:
+        engine = get_engine()
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database initialized successfully.")
+    except Exception as exc:
+        logger.error("Failed to initialize database: %s", exc)
+        raise
+
+
+def get_db():
+    """Dependency that yields a database session."""
+    session_factory = get_session_factory()
+    db = session_factory()
+    try:
+        yield db
+    finally:
+        db.close()
