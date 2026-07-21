@@ -14,7 +14,14 @@ from src.migration.dependency_graph import DependencyGraph
 from src.migration.discovery import ADFDiscoveryService
 
 
+from scripts.verify_helper import TempDatabase
+
+
 def main() -> int:
+    with TempDatabase():
+        return _run()
+
+def _run() -> int:
     fixtures = PROJECT_ROOT / "fixtures"
     errors = []
     passed = []

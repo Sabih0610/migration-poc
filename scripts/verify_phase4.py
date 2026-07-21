@@ -24,7 +24,13 @@ EXPECTED_OVERALL = AssessmentStatus.REQUIRES_CHANGE
 EXPECTED_ASSET_COUNT = 14
 
 
+from scripts.verify_helper import TempDatabase
+
 def main() -> int:
+    with TempDatabase():
+        return _run()
+
+def _run() -> int:
     fixtures = PROJECT_ROOT / "fixtures"
     errors: list[str] = []
     passed: list[str] = []

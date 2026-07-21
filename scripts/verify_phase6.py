@@ -30,22 +30,7 @@ from src.models.schemas import ApprovalStatus
 ASSESSMENT_ID = 700001
 
 
-def _use_temp_database() -> str:
-    """Point the database module at a throwaway SQLite file.
-
-    Keeps verification runs isolated from migration_poc.db and makes
-    repeated runs produce identical results. Returns the temp dir path.
-    """
-    tmp_dir = tempfile.mkdtemp(prefix="verify_phase6_")
-    url = f"sqlite:///{(Path(tmp_dir) / 'verify.db').as_posix()}"
-    engine = create_engine(url, connect_args={"check_same_thread": False})
-    db_module._engine = engine
-    db_module._SessionLocal = sessionmaker(
-        autocommit=False, autoflush=False, bind=engine
-    )
-    Base.metadata.create_all(bind=engine)
-    return tmp_dir
-
+from scripts.verify_helper import TempDatabase
 
 def main() -> int:
     print("=" * 60)
@@ -53,12 +38,8 @@ def main() -> int:
     print("=" * 60)
     print()
 
-    tmp_dir = _use_temp_database()
-    try:
+    with TempDatabase():
         return _run()
-    finally:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
-
 
 def _run() -> int:
     fixtures = PROJECT_ROOT / "fixtures"

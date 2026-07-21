@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Migration Deployment</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Migration Deployment</h1>
+    <p class="subtitle">Azure Data Factory → Microsoft Fabric (mock)</p>
+  </header>
+
+  <main>
+    <section id="plan-panel" class="panel">
+      <h2>Latest Plan &amp; Approval</h2>
+      <div id="context-meta" class="meta">Loading…</div>
+      <p class="muted" id="validation-note">
+        Post-deployment validation is deferred to Phase 8.
+      </p>
+
+      <h3>Steps</h3>
+      <table id="steps-table">
+        <thead>
+          <tr><th>#</th><th>Action</th><th>Target</th><th>Status</th><th>Resource / Error</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section id="deploy-panel" class="panel">
+      <h2>Deploy</h2>
+
+      <div class="fields">
+        <label>Mode
+          <select id="mode">
+            <option value="DRY_RUN">DRY_RUN</option>
+            <option value="MOCK">MOCK</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="buttons">
+        <button id="btn-start" type="button">Start Deployment</button>
+      </div>
+
+      <div id="deploy-status" class="status">No deployment yet.</div>
+      <div id="message" class="message"></div>
+    </section>
+  </main>
+
+  <script src="/deployment.js"></script>
+</body>
+</html>

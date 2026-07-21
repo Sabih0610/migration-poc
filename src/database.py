@@ -131,6 +131,33 @@ class ApprovalRequestRecord(Base):
         )
 
 
+class DeploymentRunRecord(Base):
+    """Persisted deployment run (Phase 7).
+
+    Records a dry-run or mock deployment of an approved plan. Stores the
+    serialized DeploymentResult as JSON. No secrets, no real Fabric IDs.
+    """
+
+    __tablename__ = "deployment_runs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    plan_id = Column(Integer, nullable=False)
+    approval_id = Column(Integer, nullable=True)
+    mode = Column(String(16), nullable=False)
+    status = Column(String(16), nullable=False)
+    result_json = Column(Text, nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    completed_at = Column(DateTime, nullable=True)
+
+    def __repr__(self) -> str:
+        return (
+            f"<DeploymentRunRecord(id={self.id}, plan_id={self.plan_id}, "
+            f"mode={self.mode!r}, status={self.status!r})>"
+        )
+
+
 # ── Engine & Session ─────────────────────────────────────────────
 
 _engine = None

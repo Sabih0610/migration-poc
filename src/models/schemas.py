@@ -711,3 +711,77 @@ class ApprovalSummary(BaseModel):
     approved: int = 0
     rejected: int = 0
     invalidated: int = 0
+
+
+# ── Deployment Models (Phase 7) ─────────────────────────────────
+
+
+class DeploymentMode(str, Enum):
+    """How a plan is executed. REAL exists but is not implemented."""
+
+    DRY_RUN = "DRY_RUN"
+    MOCK = "MOCK"
+    REAL = "REAL"
+
+
+class DeploymentStatus(str, Enum):
+    """Overall outcome of a deployment run."""
+
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    PARTIAL = "PARTIAL"
+    BLOCKED = "BLOCKED"
+
+
+class DeploymentStepStatus(str, Enum):
+    """Outcome of a single deployment step."""
+
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    SKIPPED = "SKIPPED"
+
+
+class DeploymentStepResult(BaseModel):
+    """Result of executing one plan action."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    order: int
+    action_type: str
+    target_item_type: str
+    target_item_name: str
+    status: DeploymentStepStatus
+    resource_id: Optional[str] = None
+    message: str = ""
+    error: Optional[str] = None
+
+
+class DeploymentSummary(BaseModel):
+    """Aggregate counts for a deployment run."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    mode: DeploymentMode
+    status: DeploymentStatus
+    total_steps: int = 0
+    succeeded: int = 0
+    failed: int = 0
+    skipped: int = 0
+    resources_created: int = 0
+
+
+class DeploymentResult(BaseModel):
+    """Complete result of a (mock or dry-run) deployment."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    deployment_id: Optional[int] = None
+    plan_id: int
+    approval_id: int
+    mode: DeploymentMode
+    status: DeploymentStatus
+    steps: list[DeploymentStepResult] = Field(default_factory=list)
+    summary: Optional[DeploymentSummary] = None
+    error: Optional[str] = None
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
