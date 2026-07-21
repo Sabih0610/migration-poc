@@ -101,6 +101,36 @@ class MigrationPlanRecord(Base):
         )
 
 
+class ApprovalRequestRecord(Base):
+    """Persisted migration-plan approval (Phase 6).
+
+    Bound to a plan id, version, and fingerprint so any plan change
+    invalidates a prior approval. Stores no secrets.
+    """
+
+    __tablename__ = "approval_requests"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    plan_id = Column(Integer, nullable=False)
+    plan_version = Column(Integer, nullable=False)
+    plan_fingerprint = Column(String(64), nullable=False)
+    status = Column(String(16), nullable=False, default="PENDING")
+    requested_by = Column(String(255), nullable=False)
+    decided_by = Column(String(255), nullable=True)
+    request_comment = Column(Text, nullable=True)
+    decision_comment = Column(Text, nullable=True)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    decided_at = Column(DateTime, nullable=True)
+
+    def __repr__(self) -> str:
+        return (
+            f"<ApprovalRequestRecord(id={self.id}, plan_id={self.plan_id}, "
+            f"status={self.status!r})>"
+        )
+
+
 # ── Engine & Session ─────────────────────────────────────────────
 
 _engine = None

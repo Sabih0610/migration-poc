@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Migration Plan Approval</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Migration Plan Approval</h1>
+    <p class="subtitle">Azure Data Factory → Microsoft Fabric</p>
+  </header>
+
+  <main>
+    <section id="plan-panel" class="panel">
+      <h2>Latest Plan</h2>
+      <div id="plan-meta" class="meta">Loading…</div>
+
+      <h3>Deployment Actions</h3>
+      <table id="actions-table">
+        <thead>
+          <tr><th>#</th><th>Action</th><th>Target</th><th>Risk</th><th>Approval</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <h3>Manual Actions</h3>
+      <ul id="manual-list" class="list"></ul>
+
+      <h3>Validation Rules</h3>
+      <ul id="validation-list" class="list"></ul>
+    </section>
+
+    <section id="approval-panel" class="panel">
+      <h2>Approval</h2>
+      <div id="approval-status" class="status">No approval yet.</div>
+
+      <div class="fields">
+        <label>User <input id="user" type="text" placeholder="your name" /></label>
+        <label>Comment <input id="comment" type="text" placeholder="optional" /></label>
+      </div>
+
+      <div class="buttons">
+        <button id="btn-request" type="button">Request Approval</button>
+        <button id="btn-approve" type="button" class="approve">Approve</button>
+        <button id="btn-reject" type="button" class="reject">Reject</button>
+      </div>
+
+      <div id="message" class="message"></div>
+    </section>
+  </main>
+
+  <script src="/approval.js"></script>
+</body>
+</html>

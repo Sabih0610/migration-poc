@@ -43,6 +43,14 @@ async def generate_plan():
     )
     record = save_plan(plan, assessment_id=assessment_record["id"])
 
+    # A new plan version supersedes any prior approvals for this assessment.
+    try:
+        from src.approvals.approval_service import invalidate_stale_approvals
+
+        invalidate_stale_approvals(record["id"])
+    except Exception as exc:  # approvals are non-critical to plan generation
+        logger.warning("Could not invalidate stale approvals: %s", exc)
+
     return {
         "status": "completed",
         "plan_id": record["id"],

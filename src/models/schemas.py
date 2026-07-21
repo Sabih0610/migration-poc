@@ -645,3 +645,69 @@ class MigrationPlan(BaseModel):
     manual_actions: list[ManualAction] = Field(default_factory=list)
     validation_rules: list[ValidationRule] = Field(default_factory=list)
     summary: MigrationPlanSummary = Field(default_factory=MigrationPlanSummary)
+
+
+# ── Approval Models (Phase 6) ───────────────────────────────────
+
+
+class ApprovalStatus(str, Enum):
+    """Lifecycle state of a migration-plan approval."""
+
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    INVALIDATED = "INVALIDATED"
+
+
+class ApprovalRequest(BaseModel):
+    """Input to request approval for a plan."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    plan_id: int
+    requested_by: str
+    comment: str = ""
+
+
+class ApprovalDecision(BaseModel):
+    """Input to approve or reject an existing approval request."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    approval_id: int
+    decided_by: str
+    comment: str = ""
+
+
+class ApprovalResult(BaseModel):
+    """The full persisted state of an approval.
+
+    Binds a decision to a specific plan id, version, and fingerprint so
+    that any change to the plan invalidates a prior approval.
+    """
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    approval_id: Optional[int] = None
+    plan_id: int
+    plan_version: int
+    plan_fingerprint: str
+    status: ApprovalStatus = ApprovalStatus.PENDING
+    requested_by: str
+    decided_by: Optional[str] = None
+    request_comment: str = ""
+    decision_comment: str = ""
+    request_time: Optional[str] = None
+    decision_time: Optional[str] = None
+
+
+class ApprovalSummary(BaseModel):
+    """Aggregate counts across approval requests."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    total: int = 0
+    pending: int = 0
+    approved: int = 0
+    rejected: int = 0
+    invalidated: int = 0

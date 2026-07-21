@@ -1,0 +1,109 @@
+/* Minimal approval page styles — Phase 6. */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  color: #1f2933;
+  background: #f5f7fa;
+  line-height: 1.5;
+}
+
+header {
+  background: #1e293b;
+  color: #fff;
+  padding: 1.25rem 2rem;
+}
+
+header h1 { margin: 0; font-size: 1.4rem; }
+.subtitle { margin: 0.25rem 0 0; color: #94a3b8; font-size: 0.9rem; }
+
+main {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1.5rem;
+  padding: 1.5rem 2rem;
+  align-items: start;
+}
+
+@media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+
+.panel {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.panel h2 { margin-top: 0; font-size: 1.1rem; }
+.panel h3 { font-size: 0.95rem; margin-bottom: 0.4rem; color: #475569; }
+
+.meta { margin-bottom: 1rem; }
+
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  margin: 0.15rem 0.3rem 0.15rem 0;
+  border-radius: 999px;
+  background: #e2e8f0;
+  font-size: 0.8rem;
+}
+
+.risk-LOW { background: #dcfce7; }
+.risk-MEDIUM { background: #fef9c3; }
+.risk-HIGH { background: #fed7aa; }
+.risk-CRITICAL { background: #fecaca; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid #eef2f7; }
+th { color: #64748b; font-weight: 600; }
+
+.list { margin: 0 0 1rem; padding-left: 1.1rem; font-size: 0.85rem; }
+.muted { color: #94a3b8; list-style: none; margin-left: -1.1rem; }
+
+.status {
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  background: #f1f5f9;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+.status-APPROVED { background: #dcfce7; }
+.status-REJECTED { background: #fecaca; }
+.status-PENDING { background: #fef9c3; }
+.status-INVALIDATED { background: #e2e8f0; color: #64748b; }
+
+.fields { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+.fields label { display: flex; flex-direction: column; font-size: 0.8rem; color: #475569; }
+.fields input {
+  margin-top: 0.2rem;
+  padding: 0.45rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+button {
+  padding: 0.5rem 0.9rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  background: #334155;
+  color: #fff;
+}
+button.approve { background: #16a34a; }
+button.reject { background: #dc2626; }
+button:hover { opacity: 0.9; }
+
+.message { margin-top: 0.9rem; font-size: 0.85rem; min-height: 1.2rem; }
+.message.ok { color: #16a34a; }
+.message.error { color: #dc2626; }

@@ -6,6 +6,7 @@ credentials: the plan models carry none and a defensive scan rejects
 any payload that looks like it contains one.
 """
 
+import hashlib
 import json
 import logging
 from typing import Optional
@@ -14,6 +15,18 @@ from src.database import MigrationPlanRecord, get_session_factory
 from src.models.schemas import MigrationPlan
 
 logger = logging.getLogger(__name__)
+
+
+def compute_plan_fingerprint(plan: MigrationPlan) -> str:
+    """Return a deterministic SHA-256 fingerprint of a plan's content.
+
+    Uses a canonical (sorted-key) JSON encoding so the same plan always
+    yields the same fingerprint and any content change alters it.
+    """
+    payload = json.dumps(
+        plan.model_dump(mode="json"), sort_keys=True, separators=(",", ":")
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 # High-signal credential tokens that must never reach the database.
 _FORBIDDEN_TOKENS = (

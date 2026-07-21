@@ -3,6 +3,11 @@
 from src.models.schemas import (
     ADFInventory,
     ADFPipeline,
+    ApprovalDecision,
+    ApprovalRequest,
+    ApprovalResult,
+    ApprovalStatus,
+    ApprovalSummary,
     AssessmentIssue,
     AssessmentResult,
     AssessmentStatus,
@@ -45,6 +50,11 @@ from src.models.schemas import (
 __all__ = [
     "ADFInventory",
     "ADFPipeline",
+    "ApprovalDecision",
+    "ApprovalRequest",
+    "ApprovalResult",
+    "ApprovalStatus",
+    "ApprovalSummary",
     "AssessmentIssue",
     "AssessmentResult",
     "AssessmentStatus",
