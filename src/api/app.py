@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from src.config import get_settings
 from src.database import init_database
 from src.logging_config import configure_logging
+from src.api.routes import router as discovery_router
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,9 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+# Register routers
+app.include_router(discovery_router)
 
 
 # ── Exception handler ────────────────────────────────────────────

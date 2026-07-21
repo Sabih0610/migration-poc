@@ -278,3 +278,73 @@ class ADFInventory(BaseModel):
     datasets: list[Dataset] = Field(default_factory=list)
     data_flows: list[MappingDataFlow] = Field(default_factory=list)
     triggers: list[Trigger] = Field(default_factory=list)
+
+
+# ── Discovery Result Models (Phase 3) ───────────────────────────
+
+
+class DiscoveredAsset(BaseModel):
+    """A single asset found during discovery."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    asset_type: str = Field(..., description="pipeline|dataset|linked_service|data_flow|trigger|activity")
+    asset_name: str
+    parent: Optional[str] = Field(default=None, description="Parent asset name (e.g. pipeline for activity)")
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class DependencyEdge(BaseModel):
+    """A directed dependency between two assets."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    source: str = Field(..., description="Dependent asset name")
+    target: str = Field(..., description="Dependency target name")
+    source_type: str = Field(..., description="Type of the source asset")
+    target_type: str = Field(..., description="Type of the target asset")
+    dependency_type: str = Field(
+        ..., description="trigger_pipeline|pipeline_dataflow|pipeline_dataset|"
+        "dataflow_dataset|dataset_linked_service"
+    )
+
+
+class MissingDependency(BaseModel):
+    """A reference to an asset that does not exist in the inventory."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    source_asset: str
+    source_type: str
+    missing_reference: str
+    expected_type: str
+    dependency_type: str
+
+
+class DiscoverySummary(BaseModel):
+    """Aggregate counts from discovery."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    pipeline_count: int = 0
+    activity_count: int = 0
+    data_flow_count: int = 0
+    source_count: int = 0
+    sink_count: int = 0
+    transformation_count: int = 0
+    dataset_count: int = 0
+    linked_service_count: int = 0
+    trigger_count: int = 0
+    dependency_count: int = 0
+    missing_dependency_count: int = 0
+
+
+class DiscoveryResult(BaseModel):
+    """Complete output of the discovery engine."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    assets: list[DiscoveredAsset] = Field(default_factory=list)
+    dependencies: list[DependencyEdge] = Field(default_factory=list)
+    missing_dependencies: list[MissingDependency] = Field(default_factory=list)
+    summary: DiscoverySummary = Field(default_factory=DiscoverySummary)
