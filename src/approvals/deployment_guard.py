@@ -6,10 +6,16 @@ specific, unchanged, executable plan and raises a clear error otherwise.
 """
 
 import logging
+import re
 from dataclasses import dataclass, field
 
-from src.approvals.approval_store import get_approval
-from src.migration.plan_store import compute_plan_fingerprint, get_plan
+from src.artifacts import ArtifactPackageError, canonical_json
+from src.approvals.approval_store import get_approval, update_status
+from src.migration.plan_store import (
+    compute_plan_package_fingerprint,
+    get_plan,
+    verify_plan_package,
+)
 from src.models.schemas import ApprovalStatus
 
 logger = logging.getLogger(__name__)
@@ -36,6 +42,8 @@ class AuthorizationResult:
     approval_id: int
     plan_version: int
     plan_fingerprint: str
+    package_id: str
+    artifact_count: int
     checks_passed: list[str] = field(default_factory=list)
 
 
@@ -46,6 +54,15 @@ def _has_destructive_action(plan) -> bool:
             f"{action.action_type} {action.reason} {action.target_item_name}"
         ).lower()
         if any(word in blob for word in _DESTRUCTIVE_KEYWORDS):
+            return True
+    if plan.generated_package is not None:
+        blob = canonical_json(
+            plan.generated_package.model_dump(mode="json")
+        ).lower()
+        if any(
+            re.search(rf"\b{re.escape(word)}\b", blob)
+            for word in _DESTRUCTIVE_KEYWORDS
+        ):
             return True
     return False
 
@@ -105,13 +122,40 @@ def validate_deployment_authorization(
         )
     checks.append("version_matches")
 
-    current_fingerprint = compute_plan_fingerprint(record["plan"])
+    current_fingerprint = compute_plan_package_fingerprint(record["plan"])
     if approval.plan_fingerprint != current_fingerprint:
+        update_status(
+            approval_id,
+            ApprovalStatus.INVALIDATED,
+            decided_by="system",
+            decision_comment="Approved plan/package fingerprint changed.",
+        )
         raise DeploymentAuthorizationError(
             "Plan fingerprint has changed since approval.",
             "FINGERPRINT_MISMATCH",
         )
     checks.append("fingerprint_matches")
+
+    try:
+        verified_package = verify_plan_package(record["plan"])
+    except ArtifactPackageError as exc:
+        update_status(
+            approval_id,
+            ApprovalStatus.INVALIDATED,
+            decided_by="system",
+            decision_comment="Approved generated package is missing or modified.",
+        )
+        message = str(exc)
+        code = (
+            "PACKAGE_MISSING"
+            if "No such file" in message or "missing package files" in message
+            else "PACKAGE_INVALID"
+        )
+        raise DeploymentAuthorizationError(message, code) from exc
+    checks.append("package_exists")
+    checks.append("manifest_matches")
+    checks.append("artifact_digests_match")
+    checks.append("no_unexpected_files")
 
     if not record["plan"].executable:
         raise DeploymentAuthorizationError(
@@ -135,5 +179,7 @@ def validate_deployment_authorization(
         approval_id=approval_id,
         plan_version=record["version"],
         plan_fingerprint=current_fingerprint,
+        package_id=verified_package.package_id,
+        artifact_count=len(verified_package.artifacts),
         checks_passed=checks,
     )

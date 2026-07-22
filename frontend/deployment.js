@@ -32,10 +32,26 @@ function renderSteps(steps) {
     const tr = document.createElement("tr");
     const detail = s.error ? s.error : s.resource_id || s.message || "";
     tr.innerHTML =
-      `<td>${s.order}</td><td>${s.action_type}</td>` +
+      `<td>${s.order}</td><td>${s.artifact_id || s.action_type}</td>` +
       `<td>${s.target_item_type}: ${s.target_item_name}</td>` +
+      `<td title="${s.content_digest || ""}">${(s.content_digest || "").slice(0, 12)}</td>` +
       `<td class="step-${s.status}">${s.status}</td>` +
       `<td>${detail}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderArtifacts(plan) {
+  const tbody = $("artifacts-table").querySelector("tbody");
+  tbody.innerHTML = "";
+  const artifacts = ((plan.generated_package || {}).artifacts || []);
+  artifacts.forEach((artifact) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td>${artifact.artifact_id}</td>` +
+      `<td>${artifact.target_type}: ${artifact.target_name}</td>` +
+      `<td title="${artifact.content_digest}">${artifact.content_digest.slice(0, 12)}</td>` +
+      `<td>${(artifact.warnings || []).join("; ") || "none"}</td>`;
     tbody.appendChild(tr);
   });
 }
@@ -56,6 +72,7 @@ async function loadContext() {
     return;
   }
   state.planId = plan.data.plan_id;
+  renderArtifacts(plan.data.plan);
 
   const status = await api(
     "GET",

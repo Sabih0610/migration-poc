@@ -70,6 +70,13 @@ class TestSettingsDefaults:
         )
         assert s.migration_require_approval is True
 
+    def test_default_generated_and_report_directories(self, monkeypatch):
+        monkeypatch.delenv("GENERATED_ARTIFACTS_DIR", raising=False)
+        monkeypatch.delenv("REPORTS_DIR", raising=False)
+        s = Settings(_env_file=None)
+        assert s.generated_artifacts_dir == "./generated"
+        assert s.reports_dir == "./reports"
+
 
 class TestSettingsOverrides:
     """Verify environment variables override defaults."""
@@ -83,6 +90,13 @@ class TestSettingsOverrides:
         monkeypatch.setenv("LOG_LEVEL", "DEBUG")
         s = Settings(_env_file=None)
         assert s.log_level == "DEBUG"
+
+    def test_env_override_output_directories(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("GENERATED_ARTIFACTS_DIR", str(tmp_path / "generated"))
+        monkeypatch.setenv("REPORTS_DIR", str(tmp_path / "reports"))
+        s = Settings(_env_file=None)
+        assert s.generated_artifacts_dir == str(tmp_path / "generated")
+        assert s.reports_dir == str(tmp_path / "reports")
 
 
 class TestSafeSerialization:

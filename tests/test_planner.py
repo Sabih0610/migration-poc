@@ -126,6 +126,8 @@ def test_clean_workload_is_executable(plan):
     assert plan.executable is True
     assert plan.overall_risk == MigrationRisk.MEDIUM
     assert plan.manual_actions == []
+    assert plan.generated_package is not None
+    assert plan.summary.generated_artifact_count == 8
 
 
 # ── Validation rules ─────────────────────────────────────────────
@@ -143,8 +145,9 @@ def test_validation_rules_complete(plan):
         "total_discount_amount",
         "total_net_amount",
         "customer_region_totals",
+        "pipeline_runtime",
     } <= names
-    assert len(plan.validation_rules) == 9
+    assert len(plan.validation_rules) == 10
 
 
 def test_validation_rule_tolerances(plan):

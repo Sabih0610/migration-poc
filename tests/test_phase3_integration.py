@@ -17,6 +17,9 @@ def test_scan_and_get():
     response = client.post("/api/discovery/scan")
     assert response.status_code == 200
     assert response.json()["status"] == "completed"
+    assert response.json()["discovery_id"] > 0
+    assert response.json()["summary"]["artifact_count"] == 10
+    assert response.json()["summary"]["component_count"] == 11
 
     # Get assets
     response = client.get("/api/discovery/assets")
@@ -33,3 +36,12 @@ def test_scan_and_get():
     response = client.get("/api/discovery/summary")
     assert response.status_code == 200
     assert response.json()["pipeline_count"] == 1
+
+    # A new client/process-facing request reconstructs discovery from SQLite;
+    # no module-level discovery cache is required.
+    restarted_client = TestClient(app)
+    latest = restarted_client.get("/api/discovery/latest")
+    assert latest.status_code == 200
+    assert latest.json()["result"]["inventory"]["pipelines"][0]["name"] == (
+        "pl_sales_processing_legacy"
+    )

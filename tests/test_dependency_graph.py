@@ -72,3 +72,11 @@ def test_execution_order(discovery_result):
     graph.build_graph(discovery_result)
     order = graph.get_execution_order()
     assert len(order) > 0
+    positions = {name: index for index, name in enumerate(order)}
+    for dependency in discovery_result.dependencies:
+        assert positions[dependency.target] < positions[dependency.source]
+    assert positions["ls_adls"] < positions["ds_orders"]
+    assert positions["ds_orders"] < positions["GetOrdersMetadata"]
+    assert positions["GetOrdersMetadata"] < positions["CheckFileExists"]
+    assert positions["df_sales_processing_legacy"] < positions["pl_sales_processing_legacy"]
+    assert positions["pl_sales_processing_legacy"] < positions["trg_daily_sales"]

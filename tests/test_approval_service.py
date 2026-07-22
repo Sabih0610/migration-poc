@@ -1,22 +1,20 @@
 """Tests for the Phase 6 approval service."""
 
+import json
+from pathlib import Path
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 import src.database as db_module
+from src.config import get_settings
 from src.approvals import approval_service as svc
 from src.approvals.approval_store import save_approval, update_status
 from src.database import Base
 from src.migration.plan_store import compute_plan_fingerprint, save_plan
-from src.models.schemas import (
-    ApprovalStatus,
-    MigrationAction,
-    MigrationActionType,
-    MigrationPlan,
-    MigrationRisk,
-    TargetItemType,
-)
+from src.models.schemas import ApprovalStatus, MigrationPlan
+from tests.package_helpers import make_package_plan
 
 
 @pytest.fixture
@@ -33,19 +31,7 @@ def temp_db(tmp_path, monkeypatch):
 
 
 def _mk_plan(executable=True) -> MigrationPlan:
-    return MigrationPlan(
-        executable=executable,
-        overall_risk=MigrationRisk.MEDIUM,
-        actions=[
-            MigrationAction(
-                order=1,
-                action_type=MigrationActionType.VERIFY_WORKSPACE,
-                target_item_type=TargetItemType.WORKSPACE,
-                target_item_name="ws",
-                reason="verify",
-            )
-        ],
-    )
+    return make_package_plan(executable=executable)
 
 
 def _save(executable=True, assessment_id=1):
@@ -142,3 +128,22 @@ def test_invalidated_cannot_deploy(temp_db):
     appr = save_approval(rec["id"], rec["version"], fp, "alice")
     update_status(appr.approval_id, ApprovalStatus.INVALIDATED, decided_by="system")
     assert svc.can_deploy(rec["id"], appr.approval_id) is False
+
+
+def test_package_change_invalidates_pending_decision(temp_db):
+    rec = _save()
+    approval = svc.request_approval(rec["id"], "alice")
+    root = Path(get_settings().generated_artifacts_dir)
+    manifest = json.loads(
+        (root / rec["package_manifest_path"]).read_text(encoding="utf-8")
+    )
+    artifact_path = root / manifest["entries"][0]["relative_path"]
+    payload = json.loads(artifact_path.read_text(encoding="utf-8"))
+    payload["conversion_notes"] = []
+    payload["warnings"] = ["changed after request"]
+    artifact_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(svc.ApprovalError) as exc:
+        svc.approve(approval.approval_id, "bob")
+    assert exc.value.code == "INVALIDATED"
+    assert svc.get_status(approval.approval_id).status == ApprovalStatus.INVALIDATED

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Artifact Structural Validation</title>
+  <style>
+    body{font-family:Arial,sans-serif;max-width:1100px;margin:40px auto;padding:0 20px;color:#182230;line-height:1.5}.card{border:1px solid #ccd5df;padding:20px;border-radius:8px;margin-bottom:20px}.badge{display:inline-block;padding:3px 8px;border-radius:12px;font-size:12px;font-weight:700}.status-PASSED,.status-SUCCEEDED{background:#d8f3dc;color:#155724}.status-PASSED_WITH_WARNINGS,.status-WARNING{background:#fff3cd;color:#765600}.status-FAILED{background:#f8d7da;color:#721c24}button{padding:9px 14px;cursor:pointer}button:disabled{opacity:.55;cursor:not-allowed}.error{color:#b42318}.ok{color:#16794b}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #d7dee7;padding:8px;text-align:left;vertical-align:top}th{background:#eef3f8}
+  </style>
+</head>
+<body>
+  <h1>Artifact Structural Validation</h1>
+  <p>Compares the persisted ADF source snapshot, approved generated package, manifest, and deployed mock definitions. Customer rows and business metrics are not part of structural migration status.</p>
+  <section class="card"><h2>Latest deployment</h2><div id="deployment-meta">Loading…</div></section>
+  <section class="card">
+    <h2>Run structural validation</h2>
+    <button id="btn-validate" disabled>Validate artifacts</button>
+    <button id="btn-runtime" disabled>Run optional runtime checks</button>
+    <div id="msg" role="status"></div>
+  </section>
+  <section id="results" class="card" hidden>
+    <h2>Structural coverage</h2><div id="val-summary"></div><div id="reports"></div>
+    <table><thead><tr><th>Category</th><th>Status</th><th>Source</th><th>Target artifact</th><th>Result</th></tr></thead><tbody id="val-checks"></tbody></table>
+  </section>
+  <script src="/validation.js"></script>
+</body>
+</html>

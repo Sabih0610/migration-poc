@@ -82,6 +82,19 @@ function renderPlan(plan, meta) {
     });
   }
 
+  const artifactBody = $("artifacts-table").querySelector("tbody");
+  artifactBody.innerHTML = "";
+  const artifacts = (plan.generated_package || {}).artifacts || [];
+  artifacts.forEach((artifact) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td>${artifact.artifact_id}</td>` +
+      `<td>${artifact.target_type}: ${artifact.target_name}</td>` +
+      `<td title="${artifact.content_digest}">${artifact.content_digest.slice(0, 12)}</td>` +
+      `<td>${(artifact.warnings || []).join("; ") || "none"}</td>`;
+    artifactBody.appendChild(tr);
+  });
+
   const rules = $("validation-list");
   rules.innerHTML = "";
   (plan.validation_rules || []).forEach((r) => {

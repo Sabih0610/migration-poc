@@ -23,6 +23,11 @@ class TestDatabaseInit:
         inspector = inspect(engine)
         tables = inspector.get_table_names()
         assert "app_metadata" in tables
+        assert "discovery_runs" in tables
+        assert "structural_validation_runs" in tables
+        assert "runtime_validation_runs" in tables
+        # The existing Phase 8 table remains present and unchanged in name.
+        assert "validation_runs" in tables
 
     def test_app_metadata_columns(self, tmp_path):
         """app_metadata should have the required columns."""

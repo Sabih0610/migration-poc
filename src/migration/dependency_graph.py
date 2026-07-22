@@ -44,7 +44,9 @@ class DependencyGraph:
                 parent=asset.parent,
             )
 
-        # Add dependency edges
+        # Discovery edges are expressed as dependent -> dependency for API
+        # compatibility.  The graph stores dependency -> dependent so a
+        # topological sort naturally returns prerequisites first.
         for dep in result.dependencies:
             # Ensure both nodes exist
             if dep.source not in self._graph:
@@ -56,8 +58,8 @@ class DependencyGraph:
                     dep.target, asset_type=dep.target_type
                 )
             self._graph.add_edge(
-                dep.source,
                 dep.target,
+                dep.source,
                 dependency_type=dep.dependency_type,
                 source_type=dep.source_type,
                 target_type=dep.target_type,
@@ -81,13 +83,13 @@ class DependencyGraph:
         """Get all nodes that the given node depends on."""
         if node not in self._graph:
             return []
-        return list(nx.descendants(self._graph, node))
+        return list(nx.ancestors(self._graph, node))
 
     def get_downstream(self, node: str) -> list[str]:
         """Get all nodes that depend on the given node."""
         if node not in self._graph:
             return []
-        return list(nx.ancestors(self._graph, node))
+        return list(nx.descendants(self._graph, node))
 
     def get_execution_order(self) -> list[str]:
         """Return topological sort (execution order).
@@ -95,7 +97,7 @@ class DependencyGraph:
         Returns empty list if the graph has cycles.
         """
         try:
-            return list(nx.topological_sort(self._graph))
+            return list(nx.lexicographical_topological_sort(self._graph))
         except nx.NetworkXUnfeasible:
             logger.warning("Cannot determine execution order: graph has cycles.")
             return []
@@ -123,10 +125,10 @@ class DependencyGraph:
             })
 
         edges = []
-        for source, target, data in self._graph.edges(data=True):
+        for dependency, dependent, data in self._graph.edges(data=True):
             edges.append({
-                "source": source,
-                "target": target,
+                "source": dependent,
+                "target": dependency,
                 "dependency_type": data.get("dependency_type", "unknown"),
             })
 

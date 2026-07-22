@@ -1,9 +1,8 @@
-"""Mock Fabric Deployment Engine — Phase 7.
+"""Package-aware mock Fabric deployment engine.
 
-Executes an approved migration plan in DRY_RUN or MOCK mode. Makes no
-real Fabric calls. Deployment is gated by the Phase 6 deployment guard,
-executes actions in plan order, records every step, and stops safely on
-failure. The VALIDATE step is deferred to Phase 8.
+Deploys approved generated definitions in dependency order. DRY_RUN performs
+schema/authorization checks but creates nothing; MOCK uses only the in-memory
+definition-aware connector; REAL remains disabled.
 """
 
 import logging
@@ -24,54 +23,62 @@ from src.models.schemas import (
     DeploymentStepResult,
     DeploymentStepStatus,
     DeploymentSummary,
-    MigrationActionType,
+    GeneratedArtifact,
 )
 
 logger = logging.getLogger(__name__)
 
-# Plan action type -> mock client method name.
-_METHOD_FOR_ACTION = {
-    MigrationActionType.VERIFY_WORKSPACE: "verify_workspace",
-    MigrationActionType.CREATE_CONNECTION: "create_connection",
-    MigrationActionType.CREATE_LAKEHOUSE: "create_lakehouse",
-    MigrationActionType.CREATE_TABLE: "create_table",
-    MigrationActionType.CREATE_DATAFLOW: "create_dataflow",
-    MigrationActionType.CREATE_PIPELINE: "create_pipeline",
-    MigrationActionType.CONFIGURE_SCHEDULE: "configure_schedule",
-    MigrationActionType.RUN_TARGET: "run_target",
-}
-
-# Actions that create a tracked resource (for resources_created count).
-_CREATION_ACTIONS = {
-    MigrationActionType.CREATE_CONNECTION,
-    MigrationActionType.CREATE_LAKEHOUSE,
-    MigrationActionType.CREATE_TABLE,
-    MigrationActionType.CREATE_DATAFLOW,
-    MigrationActionType.CREATE_PIPELINE,
-    MigrationActionType.CONFIGURE_SCHEDULE,
-}
-
 
 class RealModeNotImplementedError(Exception):
-    """Raised when REAL deployment mode is requested (not yet available)."""
+    """Raised when REAL deployment mode is requested."""
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def artifact_dependency_order(
+    artifacts: list[GeneratedArtifact],
+) -> list[GeneratedArtifact]:
+    """Return deterministic dependency-first order or raise on invalid graph."""
+    by_id = {artifact.artifact_id: artifact for artifact in artifacts}
+    if len(by_id) != len(artifacts):
+        raise ValueError("duplicate artifact IDs in generated package")
+    for artifact in artifacts:
+        missing = set(artifact.dependencies) - set(by_id)
+        if missing:
+            raise ValueError(
+                f"artifact {artifact.artifact_id} has missing dependencies: "
+                f"{sorted(missing)}"
+            )
+
+    ordered: list[GeneratedArtifact] = []
+    completed: set[str] = set()
+    remaining = dict(by_id)
+    while remaining:
+        ready = sorted(
+            artifact_id
+            for artifact_id, artifact in remaining.items()
+            if set(artifact.dependencies) <= completed
+        )
+        if not ready:
+            raise ValueError("generated artifact dependency graph contains a cycle")
+        for artifact_id in ready:
+            artifact = remaining.pop(artifact_id)
+            ordered.append(artifact)
+            completed.add(artifact_id)
+    return ordered
+
+
 class DeploymentService:
-    """Executes approved plans against a mock (or dry-run) Fabric target."""
+    """Deploy approved generated definitions to the mock connector."""
 
     def __init__(self, connector: Optional[MockFabricClient] = None):
-        # Optional injected connector lets callers share state across runs
-        # (used to prove idempotency). Defaults to a fresh client per deploy.
         self._connector = connector
 
     def deploy(
         self, plan_id: int, approval_id: int, mode: DeploymentMode
     ) -> DeploymentResult:
-        """Deploy an approved plan. Returns a persisted DeploymentResult."""
         mode = DeploymentMode(mode)
         if mode == DeploymentMode.REAL:
             raise RealModeNotImplementedError(
@@ -79,132 +86,175 @@ class DeploymentService:
             )
 
         started = _now()
-
-        # ── Authorization gate ───────────────────────────────
         try:
-            validate_deployment_authorization(plan_id, approval_id)
+            authorization = validate_deployment_authorization(
+                plan_id, approval_id
+            )
         except DeploymentAuthorizationError as exc:
             return self._finish(
-                plan_id, approval_id, mode, DeploymentStatus.BLOCKED,
-                steps=[], started=started, error=f"{exc.code}: {exc.message}",
+                plan_id,
+                approval_id,
+                mode,
+                DeploymentStatus.BLOCKED,
+                [],
+                started,
+                error=f"{exc.code}: {exc.message}",
             )
 
         plan = get_plan(plan_id)["plan"]
+        package = plan.generated_package
+        try:
+            artifacts = artifact_dependency_order(package.artifacts)
+        except ValueError as exc:
+            return self._finish(
+                plan_id,
+                approval_id,
+                mode,
+                DeploymentStatus.FAILED,
+                [],
+                started,
+                error=str(exc),
+                package_id=package.package_id,
+                plan_fingerprint=authorization.plan_fingerprint,
+            )
+
         client = None
         if mode == DeploymentMode.MOCK:
             client = self._connector or MockFabricClient()
 
         steps: list[DeploymentStepResult] = []
         failed = False
-
-        for action in plan.actions:
-            action_type = MigrationActionType(action.action_type)
-
-            # Once a step fails, stop safely — record the rest as SKIPPED.
+        for order, artifact in enumerate(artifacts, start=1):
             if failed:
-                steps.append(self._skipped(action, "Skipped after earlier failure."))
+                steps.append(self._skipped(order, artifact))
                 continue
-
-            # VALIDATE is deferred to Phase 8.
-            if action_type == MigrationActionType.VALIDATE:
-                steps.append(
-                    self._skipped(action, "Validation deferred to Phase 8.")
-                )
-                continue
-
             if mode == DeploymentMode.DRY_RUN:
                 steps.append(
-                    DeploymentStepResult(
-                        order=action.order,
-                        action_type=action.action_type,
-                        target_item_type=action.target_item_type,
-                        target_item_name=action.target_item_name,
-                        status=DeploymentStepStatus.SUCCEEDED,
-                        resource_id=None,
-                        message=f"DRY_RUN: would {action.action_type} "
-                        f"'{action.target_item_name}'.",
+                    self._step(
+                        order,
+                        artifact,
+                        DeploymentStepStatus.SUCCEEDED,
+                        message=(
+                            f"DRY_RUN: validated {artifact.target_type.value} "
+                            f"'{artifact.target_name}'."
+                        ),
                     )
                 )
                 continue
-
-            # MOCK mode — call the connector.
-            method_name = _METHOD_FOR_ACTION.get(action_type)
-            if method_name is None:
-                steps.append(self._skipped(action, "No connector for this action."))
-                continue
             try:
-                resource_id = getattr(client, method_name)(action.target_item_name)
+                resource_id = client.deploy_artifact(artifact)
                 steps.append(
-                    DeploymentStepResult(
-                        order=action.order,
-                        action_type=action.action_type,
-                        target_item_type=action.target_item_type,
-                        target_item_name=action.target_item_name,
-                        status=DeploymentStepStatus.SUCCEEDED,
+                    self._step(
+                        order,
+                        artifact,
+                        DeploymentStepStatus.SUCCEEDED,
                         resource_id=resource_id,
-                        message=f"{action.action_type} '{action.target_item_name}'.",
+                        message=(
+                            f"Deployed {artifact.target_type.value} "
+                            f"'{artifact.target_name}'."
+                        ),
                     )
                 )
             except MockFabricError as exc:
                 failed = True
                 steps.append(
-                    DeploymentStepResult(
-                        order=action.order,
-                        action_type=action.action_type,
-                        target_item_type=action.target_item_type,
-                        target_item_name=action.target_item_name,
-                        status=DeploymentStepStatus.FAILED,
-                        message="Step failed.",
+                    self._step(
+                        order,
+                        artifact,
+                        DeploymentStepStatus.FAILED,
+                        message="Artifact deployment failed.",
                         error=str(exc),
                     )
                 )
 
-        status = self._overall_status(steps)
         return self._finish(
-            plan_id, approval_id, mode, status, steps=steps, started=started,
+            plan_id,
+            approval_id,
+            mode,
+            self._overall_status(steps),
+            steps,
+            started,
+            package_id=package.package_id,
+            plan_fingerprint=authorization.plan_fingerprint,
         )
 
-    # ── Helpers ──────────────────────────────────────────────────
-
     @staticmethod
-    def _skipped(action, message: str) -> DeploymentStepResult:
+    def _step(
+        order: int,
+        artifact: GeneratedArtifact,
+        status: DeploymentStepStatus,
+        resource_id: Optional[str] = None,
+        message: str = "",
+        error: Optional[str] = None,
+    ) -> DeploymentStepResult:
         return DeploymentStepResult(
-            order=action.order,
-            action_type=action.action_type,
-            target_item_type=action.target_item_type,
-            target_item_name=action.target_item_name,
-            status=DeploymentStepStatus.SKIPPED,
+            order=order,
+            action_type="deploy_artifact",
+            artifact_id=artifact.artifact_id,
+            target_item_type=artifact.target_type.value,
+            target_item_name=artifact.target_name,
+            content_digest=artifact.content_digest,
+            generated_definition=artifact.generated_definition,
+            status=status,
+            resource_id=resource_id,
             message=message,
+            error=error,
+        )
+
+    @classmethod
+    def _skipped(
+        cls, order: int, artifact: GeneratedArtifact
+    ) -> DeploymentStepResult:
+        return cls._step(
+            order,
+            artifact,
+            DeploymentStepStatus.SKIPPED,
+            message="Skipped after earlier artifact failure.",
         )
 
     @staticmethod
-    def _overall_status(steps: list[DeploymentStepResult]) -> DeploymentStatus:
+    def _overall_status(
+        steps: list[DeploymentStepResult],
+    ) -> DeploymentStatus:
         succeeded = sum(
-            1 for s in steps if s.status == DeploymentStepStatus.SUCCEEDED
+            step.status == DeploymentStepStatus.SUCCEEDED for step in steps
         )
-        failed = sum(1 for s in steps if s.status == DeploymentStepStatus.FAILED)
+        failed = sum(
+            step.status == DeploymentStepStatus.FAILED for step in steps
+        )
         if failed == 0:
             return DeploymentStatus.SUCCEEDED
-        if succeeded > 0:
-            return DeploymentStatus.PARTIAL
-        return DeploymentStatus.FAILED
+        return (
+            DeploymentStatus.PARTIAL
+            if succeeded else DeploymentStatus.FAILED
+        )
 
     def _finish(
-        self, plan_id, approval_id, mode, status, steps, started, error=None
+        self,
+        plan_id,
+        approval_id,
+        mode,
+        status,
+        steps,
+        started,
+        error=None,
+        package_id=None,
+        plan_fingerprint=None,
     ) -> DeploymentResult:
         succeeded = sum(
-            1 for s in steps if s.status == DeploymentStepStatus.SUCCEEDED
+            step.status == DeploymentStepStatus.SUCCEEDED for step in steps
         )
-        failed = sum(1 for s in steps if s.status == DeploymentStepStatus.FAILED)
-        skipped = sum(1 for s in steps if s.status == DeploymentStepStatus.SKIPPED)
+        failed = sum(
+            step.status == DeploymentStepStatus.FAILED for step in steps
+        )
+        skipped = sum(
+            step.status == DeploymentStepStatus.SKIPPED for step in steps
+        )
         resources = sum(
-            1
-            for s in steps
-            if s.status == DeploymentStepStatus.SUCCEEDED
-            and s.resource_id is not None
-            and MigrationActionType(s.action_type) in _CREATION_ACTIONS
+            step.status == DeploymentStepStatus.SUCCEEDED
+            and step.resource_id is not None
+            for step in steps
         )
-
         summary = DeploymentSummary(
             mode=mode,
             status=status,
@@ -217,6 +267,8 @@ class DeploymentService:
         result = DeploymentResult(
             plan_id=plan_id,
             approval_id=approval_id,
+            package_id=package_id,
+            plan_fingerprint=plan_fingerprint,
             mode=mode,
             status=status,
             steps=steps,
@@ -228,7 +280,10 @@ class DeploymentService:
         record = save_deployment(result)
         result.deployment_id = record["id"]
         logger.info(
-            "Deployment %d finished: mode=%s status=%s (%d steps).",
-            record["id"], mode.value, status.value, len(steps),
+            "Deployment %d finished: mode=%s status=%s (%d artifacts).",
+            record["id"],
+            mode.value,
+            status.value,
+            len(steps),
         )
         return result

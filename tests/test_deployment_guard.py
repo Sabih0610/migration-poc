@@ -1,5 +1,8 @@
 """Tests for the Phase 6 deployment guard (mostly negative)."""
 
+import json
+from pathlib import Path
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -11,15 +14,10 @@ from src.approvals.deployment_guard import (
     validate_deployment_authorization,
 )
 from src.database import Base
+from src.config import get_settings
 from src.migration.plan_store import compute_plan_fingerprint, save_plan
-from src.models.schemas import (
-    ApprovalStatus,
-    MigrationAction,
-    MigrationActionType,
-    MigrationPlan,
-    MigrationRisk,
-    TargetItemType,
-)
+from src.models.schemas import ApprovalStatus, MigrationPlan
+from tests.package_helpers import make_package_plan
 
 
 @pytest.fixture
@@ -36,28 +34,7 @@ def temp_db(tmp_path, monkeypatch):
 
 
 def _mk_plan(executable=True, delete=False) -> MigrationPlan:
-    actions = [
-        MigrationAction(
-            order=1,
-            action_type=MigrationActionType.VERIFY_WORKSPACE,
-            target_item_type=TargetItemType.WORKSPACE,
-            target_item_name="ws",
-            reason="verify",
-        )
-    ]
-    if delete:
-        actions.append(
-            MigrationAction(
-                order=2,
-                action_type=MigrationActionType.CREATE_TABLE,
-                target_item_type=TargetItemType.LAKEHOUSE_TABLE,
-                target_item_name="t",
-                reason="delete the old staging table before load",
-            )
-        )
-    return MigrationPlan(
-        executable=executable, overall_risk=MigrationRisk.MEDIUM, actions=actions
-    )
+    return make_package_plan(executable=executable, destructive=delete)
 
 
 def _seed_approved(plan_rec, version=None, fingerprint=None):
@@ -154,3 +131,45 @@ def test_delete_action_blocked(temp_db):
     with pytest.raises(DeploymentAuthorizationError) as exc:
         validate_deployment_authorization(rec["id"], approval_id)
     assert exc.value.code == "DELETE_ACTION_PRESENT"
+
+
+def _package_paths(record):
+    root = Path(get_settings().generated_artifacts_dir)
+    manifest = root / record["package_manifest_path"]
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    artifact = root / data["entries"][0]["relative_path"]
+    return root, manifest, artifact, data
+
+
+def test_missing_manifest_invalidates_approval(temp_db):
+    rec = save_plan(_mk_plan(), assessment_id=1)
+    approval_id = _seed_approved(rec)
+    _, manifest, _, _ = _package_paths(rec)
+    manifest.unlink()
+    with pytest.raises(DeploymentAuthorizationError) as exc:
+        validate_deployment_authorization(rec["id"], approval_id)
+    assert exc.value.code == "PACKAGE_MISSING"
+
+
+def test_modified_artifact_invalidates_approval(temp_db):
+    rec = save_plan(_mk_plan(), assessment_id=1)
+    approval_id = _seed_approved(rec)
+    _, _, artifact, _ = _package_paths(rec)
+    payload = json.loads(artifact.read_text(encoding="utf-8"))
+    payload["warnings"] = ["tampered"]
+    artifact.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(DeploymentAuthorizationError) as exc:
+        validate_deployment_authorization(rec["id"], approval_id)
+    assert exc.value.code == "PACKAGE_INVALID"
+
+
+def test_unexpected_package_file_rejected(temp_db):
+    rec = save_plan(_mk_plan(), assessment_id=1)
+    approval_id = _seed_approved(rec)
+    root, _, _, data = _package_paths(rec)
+    package_id = data["package_id"]
+    unexpected = root / "connections" / f"{package_id}--unexpected.json"
+    unexpected.write_text("{}", encoding="utf-8")
+    with pytest.raises(DeploymentAuthorizationError) as exc:
+        validate_deployment_authorization(rec["id"], approval_id)
+    assert exc.value.code == "PACKAGE_INVALID"

@@ -9,24 +9,68 @@ any payload that looks like it contains one.
 import hashlib
 import json
 import logging
+from pathlib import Path
 from typing import Optional
 
+from src.artifacts import (
+    ArtifactPackageError,
+    canonical_json,
+    verify_saved_package,
+    write_package,
+)
+from src.config import get_settings
 from src.database import MigrationPlanRecord, get_session_factory
 from src.models.schemas import MigrationPlan
 
 logger = logging.getLogger(__name__)
 
 
-def compute_plan_fingerprint(plan: MigrationPlan) -> str:
+def compute_plan_package_fingerprint(plan: MigrationPlan) -> str:
     """Return a deterministic SHA-256 fingerprint of a plan's content.
 
     Uses a canonical (sorted-key) JSON encoding so the same plan always
     yields the same fingerprint and any content change alters it.
     """
-    payload = json.dumps(
-        plan.model_dump(mode="json"), sort_keys=True, separators=(",", ":")
-    )
+    payload = canonical_json(_fingerprint_payload(plan.model_dump(mode="json")))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+# Backward-compatible name; there is intentionally only one canonical
+# fingerprint implementation for plan and generated-package content.
+compute_plan_fingerprint = compute_plan_package_fingerprint
+
+
+_FINGERPRINT_EXCLUDED_KEYS = {
+    "plan_id",
+    "plan_version",
+    "assessment_id",
+    "approval_id",
+    "deployment_id",
+    "discovery_id",
+    "validation_id",
+    "database_id",
+    "output_directory",
+    "absolute_path",
+    "package_path",
+    "created_at",
+    "updated_at",
+    "generated_at",
+    "started_at",
+    "completed_at",
+}
+
+
+def _fingerprint_payload(value):
+    """Strip persistence/time/location metadata from canonical content."""
+    if isinstance(value, dict):
+        return {
+            key: _fingerprint_payload(item)
+            for key, item in value.items()
+            if key not in _FINGERPRINT_EXCLUDED_KEYS
+        }
+    if isinstance(value, list):
+        return [_fingerprint_payload(item) for item in value]
+    return value
 
 # High-signal credential tokens that must never reach the database.
 _FORBIDDEN_TOKENS = (
@@ -70,6 +114,7 @@ def save_plan(plan: MigrationPlan, assessment_id: Optional[int] = None) -> dict:
     session = get_session_factory()()
     try:
         version = _next_version(session, assessment_id)
+        package_manifest_path = _write_generated_package(plan)
         record = MigrationPlanRecord(
             assessment_id=assessment_id,
             version=version,
@@ -84,13 +129,16 @@ def save_plan(plan: MigrationPlan, assessment_id: Optional[int] = None) -> dict:
             "Saved plan id=%d (assessment=%s, v%d).",
             record.id, assessment_id, version,
         )
-        return _to_record(record)
+        result = _to_record(record)
+        result["package_manifest_path"] = package_manifest_path
+        return result
     finally:
         session.close()
 
 
 def _to_record(record: MigrationPlanRecord) -> dict:
     """Convert an ORM row into a plain record with a parsed plan."""
+    plan = MigrationPlan(**json.loads(record.plan_json))
     return {
         "id": record.id,
         "assessment_id": record.assessment_id,
@@ -98,8 +146,37 @@ def _to_record(record: MigrationPlanRecord) -> dict:
         "executable": record.executable,
         "overall_risk": record.overall_risk,
         "created_at": record.created_at.isoformat() if record.created_at else None,
-        "plan": MigrationPlan(**json.loads(record.plan_json)),
+        "plan": plan,
+        "package_manifest_path": _package_manifest_path(plan),
     }
+
+
+def _write_generated_package(plan: MigrationPlan) -> Optional[str]:
+    package = plan.generated_package
+    if package is None:
+        return None
+    root = Path(get_settings().generated_artifacts_dir).resolve()
+    manifest_path = write_package(package, root)
+    return manifest_path.relative_to(root).as_posix()
+
+
+def _package_manifest_path(plan: MigrationPlan) -> Optional[str]:
+    if plan.generated_package is None:
+        return None
+    return f"manifests/{plan.generated_package.package_id}.json"
+
+
+def verify_plan_package(plan: MigrationPlan):
+    """Verify the persisted manifest/files exactly match the plan package."""
+    if plan.generated_package is None:
+        raise ArtifactPackageError("plan has no generated artifact package")
+    root = Path(get_settings().generated_artifacts_dir).resolve()
+    return verify_saved_package(plan.generated_package, root)
+
+
+def _package_id_from_json(payload: str) -> Optional[str]:
+    package = json.loads(payload).get("generated_package")
+    return package.get("package_id") if package else None
 
 
 def get_plan(plan_id: int) -> Optional[dict]:
@@ -143,6 +220,7 @@ def list_plans() -> list[dict]:
                 "executable": r.executable,
                 "overall_risk": r.overall_risk,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
+                "package_id": _package_id_from_json(r.plan_json),
             }
             for r in records
         ]

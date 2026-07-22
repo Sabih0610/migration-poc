@@ -3,6 +3,11 @@
 import pytest
 
 from src.connectors.mock_fabric_client import MockFabricClient, MockFabricError
+from tests.package_helpers import make_package_plan
+
+
+def generated_artifact():
+    return make_package_plan().generated_package.artifacts[0]
 
 
 def test_deterministic_ids():
@@ -49,3 +54,31 @@ def test_has_resource():
     client.create_table("t")
     assert client.has_resource("table", "t")
     assert not client.has_resource("table", "other")
+
+
+def test_deploys_and_stores_generated_definition():
+    artifact = generated_artifact()
+    client = MockFabricClient()
+    resource_id = client.deploy_artifact(artifact)
+    stored = client.get_deployed_artifact(artifact.artifact_id)
+    assert resource_id.startswith("mock-connection-")
+    assert stored["content_digest"] == artifact.content_digest
+    assert stored["generated_definition"] == artifact.generated_definition
+
+
+def test_definition_deployment_is_deterministic_and_idempotent():
+    artifact = generated_artifact()
+    first = MockFabricClient()
+    second = MockFabricClient()
+    id1 = first.deploy_artifact(artifact)
+    id2 = first.deploy_artifact(artifact)
+    id3 = second.deploy_artifact(artifact)
+    assert id1 == id2 == id3
+    assert first.resource_count() == 1
+
+
+def test_definition_failure_injection():
+    artifact = generated_artifact()
+    client = MockFabricClient(fail_on_action="create_connection")
+    with pytest.raises(MockFabricError, match="Injected failure"):
+        client.deploy_artifact(artifact)

@@ -29,6 +29,7 @@ _STATUS_MAP = {
     "NOT_EXECUTABLE": 409,
     "INVALID_TRANSITION": 409,
     "INVALIDATED": 409,
+    "PACKAGE_INVALID": 409,
 }
 
 
@@ -98,19 +99,40 @@ async def get_approval(approval_id: int):
 @router.get("/api/plans/{plan_id}/approval-status")
 async def approval_status(plan_id: int):
     """Return the latest approval for a plan and whether it can deploy."""
-    if get_plan(plan_id) is None:
+    plan_record = get_plan(plan_id)
+    if plan_record is None:
         raise HTTPException(status_code=404, detail=f"Plan {plan_id} not found.")
+
+    package = plan_record["plan"].generated_package
+    package_summary = None
+    if package is not None:
+        package_summary = {
+            "package_id": package.package_id,
+            "package_digest": package.manifest.package_digest,
+            "artifact_count": len(package.artifacts),
+            "artifacts": [
+                {
+                    "artifact_id": artifact.artifact_id,
+                    "target_type": artifact.target_type.value,
+                    "target_name": artifact.target_name,
+                    "content_digest": artifact.content_digest,
+                    "warnings": artifact.warnings,
+                }
+                for artifact in package.artifacts
+            ],
+        }
 
     latest = get_latest_for_plan(plan_id)
     if latest is None:
         return {"plan_id": plan_id, "status": "NONE", "approval": None,
-                "can_deploy": False}
+                "can_deploy": False, "package": package_summary}
 
     return {
         "plan_id": plan_id,
         "status": latest.status.value,
         "approval": latest.model_dump(mode="json"),
         "can_deploy": svc.can_deploy(plan_id, latest.approval_id),
+        "package": package_summary,
     }
 
 

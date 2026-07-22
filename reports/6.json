@@ -1,0 +1,1142 @@
+{
+  "report_id": "rep_6_202607d194145",
+  "generated_at": "2026-07-21T19:41:45.984074+00:00",
+  "discovery": null,
+  "assessment": {
+    "id": 19,
+    "created_at": "2026-07-21T19:41:45.678376",
+    "overall_status": "REQUIRES_CHANGE",
+    "result": {
+      "overall_status": "REQUIRES_CHANGE",
+      "assessments": [
+        {
+          "asset_name": "ls_adls",
+          "asset_type": "linked_service",
+          "status": "NEEDS_REVIEW",
+          "issues": [
+            {
+              "rule_id": "LS-ADLS-URL-001",
+              "asset_name": "ls_adls",
+              "asset_type": "linked_service",
+              "status": "NEEDS_REVIEW",
+              "severity": "LOW",
+              "message": "Linked service 'AzureBlobFS' uses a URL/endpoint only; confirm the Fabric connection and authentication.",
+              "recommended_action": "Create the equivalent Fabric connection using managed identity.",
+              "manual_review": true,
+              "blocking": false
+            }
+          ]
+        },
+        {
+          "asset_name": "ds_customer_summary",
+          "asset_type": "dataset",
+          "status": "READY",
+          "issues": [
+            {
+              "rule_id": "DS-PARQUET-001",
+              "asset_name": "ds_customer_summary",
+              "asset_type": "dataset",
+              "status": "READY",
+              "severity": "INFO",
+              "message": "Parquet dataset is supported in Fabric.",
+              "recommended_action": "No change required.",
+              "manual_review": false,
+              "blocking": false
+            }
+          ]
+        },
+        {
+          "asset_name": "ds_customers",
+          "asset_type": "dataset",
+          "status": "READY",
+          "issues": [
+            {
+              "rule_id": "DS-CSV-001",
+              "asset_name": "ds_customers",
+              "asset_type": "dataset",
+              "status": "READY",
+              "severity": "INFO",
+              "message": "Delimited text (CSV) dataset is supported in Fabric.",
+              "recommended_action": "No change required.",
+              "manual_review": false,
+              "blocking": false
+            }
+          ]
+        },
+        {
+          "asset_name": "ds_enriched_orders",
+          "asset_type": "dataset",
+          "status": "READY",
+          "issues": [
+            {
+              "rule_id": "DS-PARQUET-001",
+              "asset_name": "ds_enriched_orders",
+              "asset_type": "dataset",
+              "status": "READY",
+              "severity": "INFO",
+              "message": "Parquet dataset is supported in Fabric.",
+              "recommended_action": "No change required.",
+              "manual_review": false,
+              "blocking": false
+            }
+          ]
+        },
+        {
+          "asset_name": "ds_orders",
+          "asset_type": "dataset",
+          "status": "READY",
+          "issues": [
+            {
+              "rule_id": "DS-CSV-001",
+              "asset_name": "ds_orders",
+              "asset_type": "dataset",
+              "status": "READY",
+              "severity": "INFO",
+              "message": "Delimited text (CSV) dataset is supported in Fabric.",
+              "recommended_action": "No change required.",
+              "manual_review": false,
+              "blocking": false
+            }
+          ]
+        },
+        {
+          "asset_name": "ds_products",
+          "asset_type": "dataset",
+          "status": "READY",
+          "issues": [
+            {
+              "rule_id": "DS-CSV-001",
+              "asset_name": "ds_products",
+              "asset_type": "dataset",
+              "status": "READY",
+              "severity": "INFO",
+              "message": "Delimited text (CSV) dataset is supported in Fabric.",
+              "recommended_action": "No change required.",
+              "manual_review": false,
+              "blocking": false
+            }
+          ]
+        },
+        {
+          "asset_name": "ds_rejected_orders",
+          "asset_type": "dataset",
+          "status": "READY",
+          "issues": [
+            {
+              "rule_id": "DS-CSV-001",
+              "asset_name": "ds_rejected_orders",
+              "asset_type": "dataset",
+              "status": "READY",
+              "severity": "INFO",
+              "message": "Delimited text (CSV) dataset is supported in Fabric.",
+              "recommended_action": "No change required.",
+              "manual_review": false,
+              "blocking": false
+            }
+          ]
+        },
+        {
+          "asset_name": "df_sales_processing_legacy",
+          "asset_type": "data_flow",
+          "status": "REQUIRES_CHANGE",
+          "issues": [
+            {
+              "rule_id": "DF-DERIVE-001",
+              "asset_name": "df_sales_processing_legacy",
+              "asset_type": "data_flow",
+              "status": "READY",
+              "severity": "INFO",
+              "message": "Derived-column transformation 'CastOrderTypes' maps cleanly to Fabric.",
+              "recommended_action": "No change required.",
+              "manual_review": false,
+              "blocking": false
+            },
+            {
+              "rule_id": "DF-FILTER-001",
+              "asset_name": "df_sales_processing_legacy",
+              "asset_type": "data_flow",
+              "status": "READY",
+              "severity": "INFO",
+              "message": "Filter transformation 'ValidateQuantity' maps cleanly to Fabric.",
+              "recommended_action": "No change required.",
+              "manual_review": false,
+              "blocking": false
+            },
+            {
+              "rule_id": "DF-JOIN-001",
+              "asset_name": "df_sales_processing_legacy",
+              "asset_type": "data_flow",
+              "status": "REQUIRES_CHANGE",
+              "severity": "MEDIUM",
+              "message": "Join transformation 'JoinCustomers' needs review of join semantics in Fabric.",
+              "recommended_action": "Recreate the join in the Fabric dataflow and validate output.",
+              "manual_review": true,
+              "blocking": false
+            },
+            {
+              "rule_id": "DF-JOIN-001",
+              "asset_name": "df_sales_processing_legacy",
+              "asset_type": "data_flow",
+              "status": "REQUIRES_CHANGE",
+              "severity": "MEDIUM",
+              "message": "Join transformation 'JoinProducts' needs review of join semantics in Fabric.",
+              "recommended_action": "Recreate the join in the Fabric dataflow and validate output.",
+              "manual_review": true,
+              "blocking": false
+            },
+            {
+              "rule_id": "DF-DERIVE-001",
+              "asset_name": "df_sales_processing_legacy",
+              "asset_type": "data_flow",
+              "status": "READY",
+              "severity": "INFO",
+              "message": "Derived-column transformation 'DerivedColumns' maps cleanly to Fabric.",
+              "recommended_action": "No change required.",
+              "manual_review": false,
+              "blocking": false
+            },
+            {
+              "rule_id": "DF-SPLIT-001",
+              "asset_name": "df_sales_processing_legacy",
+              "asset_type": "data_flow",
+              "status": "REQUIRES_CHANGE",
+              "severity": "MEDIUM",
+              "message": "Conditional split 'ConditionalSplitValidRejected' needs review in Fabric.",
+              "recommended_action": "Recreate the conditional split in the Fabric dataflow and validate branches.",
+              "manual_review": true,
+              "blocking": false
+            },
+            {
+              "rule_id": "DF-AGGREGATE-001",
+              "asset_name": "df_sales_processing_legacy",
+              "asset_type": "data_flow",
+              "status": "REQUIRES_CHANGE",
+              "severity": "MEDIUM",
+              "message": "Aggregate transformation 'AggregateByCustomerRegion' needs review in Fabric.",
+              "recommended_action": "Recreate the aggregate in the Fabric dataflow and validate output.",
+              "manual_review": true,
+              "blocking": false
+            },
+            {
+              "rule_id": "DF-MULTISINK-001",
+              "asset_name": "df_sales_processing_legacy",
+              "asset_type": "data_flow",
+              "status": "NEEDS_REVIEW",
+              "severity": "LOW",
+              "message": "Data flow writes to 3 sinks; verify all targets in Fabric.",
+              "recommended_action": "Review each sink mapping after migration.",
+              "manual_review": true,
+              "blocking": false
+            }
+          ]
+        },
+        {
+          "asset_name": "pl_sales_processing_legacy",
+          "asset_type": "pipeline",
+          "status": "READY",
+          "issues": [
+            {
+              "rule_id": "PL-CONTAINER-001",
+              "asset_name": "pl_sales_processing_legacy",
+              "asset_type": "pipeline",
+              "status": "READY",
+              "severity": "INFO",
+              "message": "Pipeline container is supported in Fabric.",
+              "recommended_action": "No change required.",
+              "manual_review": false,
+              "blocking": false
+            }
+          ]
+        },
+        {
+          "asset_name": "GetOrdersMetadata",
+          "asset_type": "activity",
+          "status": "READY",
+          "issues": [
+            {
+              "rule_id": "ACT-GETMETADATA-001",
+              "asset_name": "GetOrdersMetadata",
+              "asset_type": "activity",
+              "status": "READY",
+              "severity": "INFO",
+              "message": "GetMetadata activity is supported in Fabric pipelines.",
+              "recommended_action": "No change required.",
+              "manual_review": false,
+              "blocking": false
+            }
+          ]
+        },
+        {
+          "asset_name": "CheckFileExists",
+          "asset_type": "activity",
+          "status": "READY",
+          "issues": [
+            {
+              "rule_id": "ACT-IFCONDITION-001",
+              "asset_name": "CheckFileExists",
+              "asset_type": "activity",
+              "status": "READY",
+              "severity": "INFO",
+              "message": "IfCondition activity is supported in Fabric pipelines.",
+              "recommended_action": "No change required.",
+              "manual_review": false,
+              "blocking": false
+            }
+          ]
+        },
+        {
+          "asset_name": "ExecuteSalesDataFlow",
+          "asset_type": "activity",
+          "status": "REQUIRES_CHANGE",
+          "issues": [
+            {
+              "rule_id": "ACT-EXECUTEDATAFLOW-001",
+              "asset_name": "ExecuteSalesDataFlow",
+              "asset_type": "activity",
+              "status": "REQUIRES_CHANGE",
+              "severity": "MEDIUM",
+              "message": "ExecuteDataFlow must be re-pointed at a Fabric dataflow/notebook.",
+              "recommended_action": "Recreate the mapping data flow as a Fabric artifact and update the reference.",
+              "manual_review": true,
+              "blocking": false
+            }
+          ]
+        },
+        {
+          "asset_name": "FailMissingFile",
+          "asset_type": "activity",
+          "status": "READY",
+          "issues": [
+            {
+              "rule_id": "ACT-FAIL-001",
+              "asset_name": "FailMissingFile",
+              "asset_type": "activity",
+              "status": "READY",
+              "severity": "INFO",
+              "message": "Fail activity is supported in Fabric pipelines.",
+              "recommended_action": "No change required.",
+              "manual_review": false,
+              "blocking": false
+            }
+          ]
+        },
+        {
+          "asset_name": "trg_daily_sales",
+          "asset_type": "trigger",
+          "status": "NEEDS_REVIEW",
+          "issues": [
+            {
+              "rule_id": "TRG-SCHEDULE-001",
+              "asset_name": "trg_daily_sales",
+              "asset_type": "trigger",
+              "status": "NEEDS_REVIEW",
+              "severity": "LOW",
+              "message": "Schedule trigger must be recreated as a Fabric schedule.",
+              "recommended_action": "Recreate the schedule on the migrated Fabric pipeline.",
+              "manual_review": true,
+              "blocking": false
+            }
+          ]
+        }
+      ],
+      "summary": {
+        "total_assets": 14,
+        "total_issues": 21,
+        "ready_count": 10,
+        "needs_review_count": 2,
+        "requires_change_count": 2,
+        "unsupported_count": 0,
+        "blocked_count": 0,
+        "blocking_issue_count": 0,
+        "manual_review_issue_count": 8,
+        "status_counts": {
+          "READY": 10,
+          "NEEDS_REVIEW": 2,
+          "REQUIRES_CHANGE": 2,
+          "UNSUPPORTED": 0,
+          "BLOCKED": 0
+        }
+      }
+    }
+  },
+  "plan": {
+    "executable": true,
+    "overall_risk": "MEDIUM",
+    "assessment_status": "REQUIRES_CHANGE",
+    "mappings": [
+      {
+        "source_asset": "ls_adls",
+        "source_type": "linked_service",
+        "target_item_type": "FabricConnection",
+        "target_item_name": "ls_adls",
+        "assessment_status": "NEEDS_REVIEW",
+        "rule_id": "MAP-LS-ADLS-001",
+        "mapped": true,
+        "explanation": "ADLS linked service becomes a Fabric connection (managed identity)."
+      },
+      {
+        "source_asset": "ds_customer_summary",
+        "source_type": "dataset",
+        "target_item_type": "LakehouseTable",
+        "target_item_name": "customer_summary",
+        "assessment_status": "READY",
+        "rule_id": "MAP-DS-PARQUET-SINK-001",
+        "mapped": true,
+        "explanation": "Parquet sink dataset becomes a Lakehouse table."
+      },
+      {
+        "source_asset": "ds_customers",
+        "source_type": "dataset",
+        "target_item_type": "DataflowGen2",
+        "target_item_name": "df_sales_processing_legacy",
+        "assessment_status": "READY",
+        "rule_id": "MAP-DS-CSV-SRC-001",
+        "mapped": true,
+        "explanation": "CSV source dataset is configured as a source inside the Dataflow Gen2."
+      },
+      {
+        "source_asset": "ds_enriched_orders",
+        "source_type": "dataset",
+        "target_item_type": "LakehouseTable",
+        "target_item_name": "enriched_orders",
+        "assessment_status": "READY",
+        "rule_id": "MAP-DS-PARQUET-SINK-001",
+        "mapped": true,
+        "explanation": "Parquet sink dataset becomes a Lakehouse table."
+      },
+      {
+        "source_asset": "ds_orders",
+        "source_type": "dataset",
+        "target_item_type": "DataflowGen2",
+        "target_item_name": "df_sales_processing_legacy",
+        "assessment_status": "READY",
+        "rule_id": "MAP-DS-CSV-SRC-001",
+        "mapped": true,
+        "explanation": "CSV source dataset is configured as a source inside the Dataflow Gen2."
+      },
+      {
+        "source_asset": "ds_products",
+        "source_type": "dataset",
+        "target_item_type": "DataflowGen2",
+        "target_item_name": "df_sales_processing_legacy",
+        "assessment_status": "READY",
+        "rule_id": "MAP-DS-CSV-SRC-001",
+        "mapped": true,
+        "explanation": "CSV source dataset is configured as a source inside the Dataflow Gen2."
+      },
+      {
+        "source_asset": "ds_rejected_orders",
+        "source_type": "dataset",
+        "target_item_type": "LakehouseTable",
+        "target_item_name": "rejected_orders",
+        "assessment_status": "READY",
+        "rule_id": "MAP-DS-CSV-SINK-001",
+        "mapped": true,
+        "explanation": "CSV rejected sink becomes a Lakehouse rejected table."
+      },
+      {
+        "source_asset": "df_sales_processing_legacy",
+        "source_type": "data_flow",
+        "target_item_type": "DataflowGen2",
+        "target_item_name": "df_sales_processing_legacy",
+        "assessment_status": "REQUIRES_CHANGE",
+        "rule_id": "MAP-DATAFLOW-001",
+        "mapped": true,
+        "explanation": "Mapping Data Flow is rebuilt as a Fabric Dataflow Gen2."
+      },
+      {
+        "source_asset": "pl_sales_processing_legacy",
+        "source_type": "pipeline",
+        "target_item_type": "FabricDataPipeline",
+        "target_item_name": "pl_sales_processing_legacy",
+        "assessment_status": "READY",
+        "rule_id": "MAP-PIPELINE-001",
+        "mapped": true,
+        "explanation": "ADF pipeline becomes a Fabric Data Pipeline."
+      },
+      {
+        "source_asset": "GetOrdersMetadata",
+        "source_type": "activity",
+        "target_item_type": "FabricDataPipeline",
+        "target_item_name": "pl_sales_processing_legacy",
+        "assessment_status": "READY",
+        "rule_id": "MAP-ACTIVITY-001",
+        "mapped": true,
+        "explanation": "Activity is recreated inside the Fabric Data Pipeline."
+      },
+      {
+        "source_asset": "CheckFileExists",
+        "source_type": "activity",
+        "target_item_type": "FabricDataPipeline",
+        "target_item_name": "pl_sales_processing_legacy",
+        "assessment_status": "READY",
+        "rule_id": "MAP-ACTIVITY-001",
+        "mapped": true,
+        "explanation": "Activity is recreated inside the Fabric Data Pipeline."
+      },
+      {
+        "source_asset": "ExecuteSalesDataFlow",
+        "source_type": "activity",
+        "target_item_type": "FabricDataPipeline",
+        "target_item_name": "pl_sales_processing_legacy",
+        "assessment_status": "REQUIRES_CHANGE",
+        "rule_id": "MAP-ACTIVITY-001",
+        "mapped": true,
+        "explanation": "Activity is recreated inside the Fabric Data Pipeline."
+      },
+      {
+        "source_asset": "FailMissingFile",
+        "source_type": "activity",
+        "target_item_type": "FabricDataPipeline",
+        "target_item_name": "pl_sales_processing_legacy",
+        "assessment_status": "READY",
+        "rule_id": "MAP-ACTIVITY-001",
+        "mapped": true,
+        "explanation": "Activity is recreated inside the Fabric Data Pipeline."
+      },
+      {
+        "source_asset": "trg_daily_sales",
+        "source_type": "trigger",
+        "target_item_type": "FabricSchedule",
+        "target_item_name": "trg_daily_sales",
+        "assessment_status": "NEEDS_REVIEW",
+        "rule_id": "MAP-TRG-SCHEDULE-001",
+        "mapped": true,
+        "explanation": "Schedule trigger becomes a Fabric pipeline schedule."
+      }
+    ],
+    "actions": [
+      {
+        "order": 1,
+        "action_type": "verify_workspace",
+        "source_asset": null,
+        "source_type": null,
+        "target_item_type": "Workspace",
+        "target_item_name": "fabric_workspace",
+        "risk": "LOW",
+        "reason": "Verify the target Fabric workspace exists.",
+        "approval_required": false,
+        "automated": true,
+        "requires_conversion": false,
+        "warning": null
+      },
+      {
+        "order": 2,
+        "action_type": "create_connection",
+        "source_asset": "ls_adls",
+        "source_type": "linked_service",
+        "target_item_type": "FabricConnection",
+        "target_item_name": "ls_adls",
+        "risk": "LOW",
+        "reason": "ADLS linked service becomes a Fabric connection (managed identity).",
+        "approval_required": true,
+        "automated": true,
+        "requires_conversion": false,
+        "warning": "ADLS linked service becomes a Fabric connection (managed identity)."
+      },
+      {
+        "order": 3,
+        "action_type": "create_lakehouse",
+        "source_asset": null,
+        "source_type": null,
+        "target_item_type": "Lakehouse",
+        "target_item_name": "lakehouse_migration_poc",
+        "risk": "LOW",
+        "reason": "Create the Lakehouse for curated outputs.",
+        "approval_required": false,
+        "automated": true,
+        "requires_conversion": false,
+        "warning": null
+      },
+      {
+        "order": 4,
+        "action_type": "create_table",
+        "source_asset": "ds_customer_summary",
+        "source_type": "dataset",
+        "target_item_type": "LakehouseTable",
+        "target_item_name": "customer_summary",
+        "risk": "LOW",
+        "reason": "Parquet sink dataset becomes a Lakehouse table.",
+        "approval_required": false,
+        "automated": true,
+        "requires_conversion": false,
+        "warning": null
+      },
+      {
+        "order": 5,
+        "action_type": "create_table",
+        "source_asset": "ds_enriched_orders",
+        "source_type": "dataset",
+        "target_item_type": "LakehouseTable",
+        "target_item_name": "enriched_orders",
+        "risk": "LOW",
+        "reason": "Parquet sink dataset becomes a Lakehouse table.",
+        "approval_required": false,
+        "automated": true,
+        "requires_conversion": false,
+        "warning": null
+      },
+      {
+        "order": 6,
+        "action_type": "create_table",
+        "source_asset": "ds_rejected_orders",
+        "source_type": "dataset",
+        "target_item_type": "LakehouseTable",
+        "target_item_name": "rejected_orders",
+        "risk": "LOW",
+        "reason": "CSV rejected sink becomes a Lakehouse rejected table.",
+        "approval_required": false,
+        "automated": true,
+        "requires_conversion": false,
+        "warning": null
+      },
+      {
+        "order": 7,
+        "action_type": "create_dataflow",
+        "source_asset": "df_sales_processing_legacy",
+        "source_type": "data_flow",
+        "target_item_type": "DataflowGen2",
+        "target_item_name": "df_sales_processing_legacy",
+        "risk": "MEDIUM",
+        "reason": "Mapping Data Flow is rebuilt as a Fabric Dataflow Gen2.",
+        "approval_required": true,
+        "automated": true,
+        "requires_conversion": true,
+        "warning": null
+      },
+      {
+        "order": 8,
+        "action_type": "create_pipeline",
+        "source_asset": "pl_sales_processing_legacy",
+        "source_type": "pipeline",
+        "target_item_type": "FabricDataPipeline",
+        "target_item_name": "pl_sales_processing_legacy",
+        "risk": "LOW",
+        "reason": "ADF pipeline becomes a Fabric Data Pipeline.",
+        "approval_required": false,
+        "automated": true,
+        "requires_conversion": false,
+        "warning": null
+      },
+      {
+        "order": 9,
+        "action_type": "configure_schedule",
+        "source_asset": "trg_daily_sales",
+        "source_type": "trigger",
+        "target_item_type": "FabricSchedule",
+        "target_item_name": "trg_daily_sales",
+        "risk": "LOW",
+        "reason": "Schedule trigger becomes a Fabric pipeline schedule.",
+        "approval_required": true,
+        "automated": true,
+        "requires_conversion": false,
+        "warning": "Schedule trigger becomes a Fabric pipeline schedule."
+      },
+      {
+        "order": 10,
+        "action_type": "run_target",
+        "source_asset": null,
+        "source_type": null,
+        "target_item_type": "FabricDataPipeline",
+        "target_item_name": "pl_sales_processing_legacy",
+        "risk": "MEDIUM",
+        "reason": "Run the migrated Fabric pipeline once.",
+        "approval_required": true,
+        "automated": true,
+        "requires_conversion": false,
+        "warning": null
+      },
+      {
+        "order": 11,
+        "action_type": "validate",
+        "source_asset": null,
+        "source_type": null,
+        "target_item_type": "None",
+        "target_item_name": "validation_suite",
+        "risk": "LOW",
+        "reason": "Run post-migration validation rules.",
+        "approval_required": false,
+        "automated": true,
+        "requires_conversion": false,
+        "warning": null
+      }
+    ],
+    "manual_actions": [],
+    "validation_rules": [
+      {
+        "name": "pipeline_run_status",
+        "rule_type": "run_status",
+        "source": "adf:pl_sales_processing_legacy.run",
+        "target": "fabric:pl_sales_processing_legacy.run",
+        "comparison": "equals",
+        "tolerance": 0.0,
+        "blocking": true
+      },
+      {
+        "name": "customer_summary_row_count",
+        "rule_type": "row_count",
+        "source": "adf:ds_customer_summary",
+        "target": "lakehouse:customer_summary",
+        "comparison": "equals",
+        "tolerance": 0.0,
+        "blocking": true
+      },
+      {
+        "name": "enriched_orders_row_count",
+        "rule_type": "row_count",
+        "source": "adf:ds_enriched_orders",
+        "target": "lakehouse:enriched_orders",
+        "comparison": "equals",
+        "tolerance": 0.0,
+        "blocking": true
+      },
+      {
+        "name": "rejected_orders_row_count",
+        "rule_type": "row_count",
+        "source": "adf:ds_rejected_orders",
+        "target": "lakehouse:rejected_orders",
+        "comparison": "equals",
+        "tolerance": 0.0,
+        "blocking": true
+      },
+      {
+        "name": "output_schema",
+        "rule_type": "schema",
+        "source": "adf:enriched_orders.schema",
+        "target": "lakehouse:enriched_orders.schema",
+        "comparison": "equals",
+        "tolerance": 0.0,
+        "blocking": true
+      },
+      {
+        "name": "total_gross_amount",
+        "rule_type": "sum",
+        "source": "adf:enriched_orders.GrossAmount",
+        "target": "lakehouse:enriched_orders.GrossAmount",
+        "comparison": "abs_diff_within_tolerance",
+        "tolerance": 0.01,
+        "blocking": true
+      },
+      {
+        "name": "total_discount_amount",
+        "rule_type": "sum",
+        "source": "adf:enriched_orders.DiscountAmount",
+        "target": "lakehouse:enriched_orders.DiscountAmount",
+        "comparison": "abs_diff_within_tolerance",
+        "tolerance": 0.01,
+        "blocking": true
+      },
+      {
+        "name": "total_net_amount",
+        "rule_type": "sum",
+        "source": "adf:enriched_orders.NetAmount",
+        "target": "lakehouse:enriched_orders.NetAmount",
+        "comparison": "abs_diff_within_tolerance",
+        "tolerance": 0.01,
+        "blocking": true
+      },
+      {
+        "name": "customer_region_totals",
+        "rule_type": "grouped_sum",
+        "source": "adf:customer_summary.TotalNetAmount_by_region",
+        "target": "lakehouse:customer_summary.TotalNetAmount_by_region",
+        "comparison": "abs_diff_within_tolerance",
+        "tolerance": 0.01,
+        "blocking": true
+      },
+      {
+        "name": "pipeline_runtime",
+        "rule_type": "runtime",
+        "source": "adf:pl_sales_processing_legacy.runtime",
+        "target": "fabric:pl_sales_processing_legacy.runtime",
+        "comparison": "within_tolerance",
+        "tolerance": 0.2,
+        "blocking": false
+      }
+    ],
+    "summary": {
+      "total_source_assets": 14,
+      "mapped_count": 14,
+      "action_count": 11,
+      "manual_action_count": 0,
+      "validation_rule_count": 10,
+      "executable": true,
+      "overall_risk": "MEDIUM",
+      "risk_counts": {
+        "LOW": 9,
+        "MEDIUM": 2,
+        "HIGH": 0,
+        "CRITICAL": 0
+      },
+      "target_item_counts": {
+        "FabricConnection": 1,
+        "LakehouseTable": 3,
+        "DataflowGen2": 4,
+        "FabricDataPipeline": 5,
+        "FabricSchedule": 1
+      }
+    }
+  },
+  "approval": {
+    "approval_id": 13,
+    "plan_id": 19,
+    "plan_version": 1,
+    "plan_fingerprint": "843c1b6f52e5702976a6f641b649a66474fa36873f25eb9e9ebceafd56ddd03d",
+    "status": "APPROVED",
+    "requested_by": "alice",
+    "decided_by": "bob",
+    "request_comment": "",
+    "decision_comment": "",
+    "request_time": "2026-07-21T19:41:45.792305",
+    "decision_time": "2026-07-21T19:41:45.810399"
+  },
+  "deployment": {
+    "id": 25,
+    "plan_id": 19,
+    "approval_id": 13,
+    "mode": "MOCK",
+    "status": "SUCCEEDED",
+    "created_at": "2026-07-21T19:41:45.890688",
+    "completed_at": "2026-07-21T19:41:45.890688",
+    "result": {
+      "deployment_id": null,
+      "plan_id": 19,
+      "approval_id": 13,
+      "mode": "MOCK",
+      "status": "SUCCEEDED",
+      "steps": [
+        {
+          "order": 1,
+          "action_type": "verify_workspace",
+          "target_item_type": "Workspace",
+          "target_item_name": "fabric_workspace",
+          "status": "SUCCEEDED",
+          "resource_id": "mock-workspace-fabric_workspace",
+          "message": "MigrationActionType.VERIFY_WORKSPACE 'fabric_workspace'.",
+          "error": null
+        },
+        {
+          "order": 2,
+          "action_type": "create_connection",
+          "target_item_type": "FabricConnection",
+          "target_item_name": "ls_adls",
+          "status": "SUCCEEDED",
+          "resource_id": "mock-connection-ls_adls",
+          "message": "MigrationActionType.CREATE_CONNECTION 'ls_adls'.",
+          "error": null
+        },
+        {
+          "order": 3,
+          "action_type": "create_lakehouse",
+          "target_item_type": "Lakehouse",
+          "target_item_name": "lakehouse_migration_poc",
+          "status": "SUCCEEDED",
+          "resource_id": "mock-lakehouse-lakehouse_migration_poc",
+          "message": "MigrationActionType.CREATE_LAKEHOUSE 'lakehouse_migration_poc'.",
+          "error": null
+        },
+        {
+          "order": 4,
+          "action_type": "create_table",
+          "target_item_type": "LakehouseTable",
+          "target_item_name": "customer_summary",
+          "status": "SUCCEEDED",
+          "resource_id": "mock-table-customer_summary",
+          "message": "MigrationActionType.CREATE_TABLE 'customer_summary'.",
+          "error": null
+        },
+        {
+          "order": 5,
+          "action_type": "create_table",
+          "target_item_type": "LakehouseTable",
+          "target_item_name": "enriched_orders",
+          "status": "SUCCEEDED",
+          "resource_id": "mock-table-enriched_orders",
+          "message": "MigrationActionType.CREATE_TABLE 'enriched_orders'.",
+          "error": null
+        },
+        {
+          "order": 6,
+          "action_type": "create_table",
+          "target_item_type": "LakehouseTable",
+          "target_item_name": "rejected_orders",
+          "status": "SUCCEEDED",
+          "resource_id": "mock-table-rejected_orders",
+          "message": "MigrationActionType.CREATE_TABLE 'rejected_orders'.",
+          "error": null
+        },
+        {
+          "order": 7,
+          "action_type": "create_dataflow",
+          "target_item_type": "DataflowGen2",
+          "target_item_name": "df_sales_processing_legacy",
+          "status": "SUCCEEDED",
+          "resource_id": "mock-dataflow-df_sales_processing_legacy",
+          "message": "MigrationActionType.CREATE_DATAFLOW 'df_sales_processing_legacy'.",
+          "error": null
+        },
+        {
+          "order": 8,
+          "action_type": "create_pipeline",
+          "target_item_type": "FabricDataPipeline",
+          "target_item_name": "pl_sales_processing_legacy",
+          "status": "SUCCEEDED",
+          "resource_id": "mock-pipeline-pl_sales_processing_legacy",
+          "message": "MigrationActionType.CREATE_PIPELINE 'pl_sales_processing_legacy'.",
+          "error": null
+        },
+        {
+          "order": 9,
+          "action_type": "configure_schedule",
+          "target_item_type": "FabricSchedule",
+          "target_item_name": "trg_daily_sales",
+          "status": "SUCCEEDED",
+          "resource_id": "mock-schedule-trg_daily_sales",
+          "message": "MigrationActionType.CONFIGURE_SCHEDULE 'trg_daily_sales'.",
+          "error": null
+        },
+        {
+          "order": 10,
+          "action_type": "run_target",
+          "target_item_type": "FabricDataPipeline",
+          "target_item_name": "pl_sales_processing_legacy",
+          "status": "SUCCEEDED",
+          "resource_id": "mock-run-pl_sales_processing_legacy",
+          "message": "MigrationActionType.RUN_TARGET 'pl_sales_processing_legacy'.",
+          "error": null
+        },
+        {
+          "order": 11,
+          "action_type": "validate",
+          "target_item_type": "None",
+          "target_item_name": "validation_suite",
+          "status": "SKIPPED",
+          "resource_id": null,
+          "message": "Validation deferred to Phase 8.",
+          "error": null
+        }
+      ],
+      "summary": {
+        "mode": "MOCK",
+        "status": "SUCCEEDED",
+        "total_steps": 11,
+        "succeeded": 10,
+        "failed": 0,
+        "skipped": 1,
+        "resources_created": 8
+      },
+      "error": null,
+      "started_at": "2026-07-21T19:41:45.880312+00:00",
+      "completed_at": "2026-07-21T19:41:45.890688+00:00"
+    }
+  },
+  "validation": {
+    "validation_id": null,
+    "deployment_id": 25,
+    "plan_id": 19,
+    "status": "FAILED",
+    "started_at": "2026-07-21T19:41:45.914251+00:00",
+    "completed_at": "2026-07-21T19:41:45.924433+00:00",
+    "summary": {
+      "total_checks": 10,
+      "passed": 9,
+      "warnings": 0,
+      "failed": 1,
+      "skipped": 0
+    },
+    "source_metrics": {
+      "pipeline": {
+        "row_count": null,
+        "schema_hash": null,
+        "gross_total": null,
+        "discount_total": null,
+        "net_total": null,
+        "customer_region_totals": null,
+        "rejected_count": null,
+        "runtime_seconds": 120.0,
+        "run_status": "Succeeded",
+        "error": null
+      },
+      "enriched_orders": {
+        "row_count": 18,
+        "schema_hash": "hash_enriched_v1",
+        "gross_total": 5000.0,
+        "discount_total": 200.0,
+        "net_total": 4800.0,
+        "customer_region_totals": null,
+        "rejected_count": null,
+        "runtime_seconds": null,
+        "run_status": null,
+        "error": null
+      },
+      "rejected_orders": {
+        "row_count": 2,
+        "schema_hash": "hash_rejected_v1",
+        "gross_total": null,
+        "discount_total": null,
+        "net_total": null,
+        "customer_region_totals": null,
+        "rejected_count": null,
+        "runtime_seconds": null,
+        "run_status": null,
+        "error": null
+      },
+      "customer_summary": {
+        "row_count": 8,
+        "schema_hash": "hash_summary_v1",
+        "gross_total": null,
+        "discount_total": null,
+        "net_total": null,
+        "customer_region_totals": {
+          "North": 2000.0,
+          "South": 2800.0
+        },
+        "rejected_count": null,
+        "runtime_seconds": null,
+        "run_status": null,
+        "error": null
+      }
+    },
+    "target_metrics": {
+      "pipeline": {
+        "row_count": null,
+        "schema_hash": null,
+        "gross_total": null,
+        "discount_total": null,
+        "net_total": null,
+        "customer_region_totals": null,
+        "rejected_count": null,
+        "runtime_seconds": 120.0,
+        "run_status": "Succeeded",
+        "error": null
+      },
+      "enriched_orders": {
+        "row_count": 18,
+        "schema_hash": "hash_enriched_v1",
+        "gross_total": 5000.05,
+        "discount_total": 200.0,
+        "net_total": 4800.0,
+        "customer_region_totals": null,
+        "rejected_count": null,
+        "runtime_seconds": null,
+        "run_status": null,
+        "error": null
+      },
+      "rejected_orders": {
+        "row_count": 2,
+        "schema_hash": "hash_rejected_v1",
+        "gross_total": null,
+        "discount_total": null,
+        "net_total": null,
+        "customer_region_totals": null,
+        "rejected_count": null,
+        "runtime_seconds": null,
+        "run_status": null,
+        "error": null
+      },
+      "customer_summary": {
+        "row_count": 8,
+        "schema_hash": "hash_summary_v1",
+        "gross_total": null,
+        "discount_total": null,
+        "net_total": null,
+        "customer_region_totals": {
+          "North": 2000.0,
+          "South": 2800.0
+        },
+        "rejected_count": null,
+        "runtime_seconds": null,
+        "run_status": null,
+        "error": null
+      }
+    },
+    "checks": [
+      {
+        "rule_name": "pipeline_run_status",
+        "rule_type": "run_status",
+        "status": "PASSED",
+        "source_value": "Succeeded",
+        "target_value": "Succeeded",
+        "message": "Exact match"
+      },
+      {
+        "rule_name": "customer_summary_row_count",
+        "rule_type": "row_count",
+        "status": "PASSED",
+        "source_value": 8,
+        "target_value": 8,
+        "message": "Exact match"
+      },
+      {
+        "rule_name": "enriched_orders_row_count",
+        "rule_type": "row_count",
+        "status": "PASSED",
+        "source_value": 18,
+        "target_value": 18,
+        "message": "Exact match"
+      },
+      {
+        "rule_name": "rejected_orders_row_count",
+        "rule_type": "row_count",
+        "status": "PASSED",
+        "source_value": 2,
+        "target_value": 2,
+        "message": "Exact match"
+      },
+      {
+        "rule_name": "output_schema",
+        "rule_type": "schema",
+        "status": "PASSED",
+        "source_value": "hash_enriched_v1",
+        "target_value": "hash_enriched_v1",
+        "message": "Exact match"
+      },
+      {
+        "rule_name": "total_gross_amount",
+        "rule_type": "sum",
+        "status": "FAILED",
+        "source_value": 5000.0,
+        "target_value": 5000.05,
+        "message": "Difference 0.0500000000001819 > 0.01"
+      },
+      {
+        "rule_name": "total_discount_amount",
+        "rule_type": "sum",
+        "status": "PASSED",
+        "source_value": 200.0,
+        "target_value": 200.0,
+        "message": "Within tolerance"
+      },
+      {
+        "rule_name": "total_net_amount",
+        "rule_type": "sum",
+        "status": "PASSED",
+        "source_value": 4800.0,
+        "target_value": 4800.0,
+        "message": "Within tolerance"
+      },
+      {
+        "rule_name": "customer_region_totals",
+        "rule_type": "grouped_sum",
+        "status": "PASSED",
+        "source_value": {
+          "North": 2000.0,
+          "South": 2800.0
+        },
+        "target_value": {
+          "North": 2000.0,
+          "South": 2800.0
+        },
+        "message": "Exact match"
+      },
+      {
+        "rule_name": "pipeline_runtime",
+        "rule_type": "runtime",
+        "status": "PASSED",
+        "source_value": 120.0,
+        "target_value": 120.0,
+        "message": "Within tolerance"
+      }
+    ]
+  }
+}

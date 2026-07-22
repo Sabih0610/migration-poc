@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     # ── Database ─────────────────────────────────────────────────
     database_url: str = Field(default="sqlite:///./migration_poc.db")
 
+    # ── Generated files ─────────────────────────────────────────────
+    generated_artifacts_dir: str = Field(default="./generated")
+    reports_dir: str = Field(default="./reports")
+
     # ── Azure (required for cloud operations) ────────────────────
     azure_tenant_id: str = Field(default="")
     azure_client_id: str = Field(default="")
@@ -34,6 +38,13 @@ class Settings(BaseSettings):
     azure_subscription_id: str = Field(default="")
     azure_resource_group: str = Field(default="")
     azure_location: str = Field(default="")
+
+    # ── Azure Data Factory discovery (Phase 9, read-only) ────────
+    # Real Azure discovery is DISABLED by default. It only runs when
+    # enable_azure_discovery is true AND the discovery settings are set.
+    azure_data_factory_name: str = Field(default="")
+    enable_azure_discovery: bool = Field(default=False)
+    azure_discovery_timeout_seconds: int = Field(default=60)
 
     # ── Fabric ───────────────────────────────────────────────────
     fabric_workspace_id: str = Field(default="")
@@ -71,6 +82,22 @@ class Settings(BaseSettings):
             "fabric_workspace_id",
         ]
         return [name for name in required if not getattr(self, name, "")]
+
+    def get_missing_azure_discovery_settings(self) -> list[str]:
+        """Return the read-only-discovery settings that are still empty."""
+        required = [
+            "azure_tenant_id",
+            "azure_client_id",
+            "azure_client_secret",
+            "azure_subscription_id",
+            "azure_resource_group",
+            "azure_data_factory_name",
+        ]
+        return [name for name in required if not getattr(self, name, "")]
+
+    def azure_discovery_ready(self) -> bool:
+        """True only when discovery is enabled and fully configured."""
+        return self.enable_azure_discovery and not self.get_missing_azure_discovery_settings()
 
 
 @lru_cache

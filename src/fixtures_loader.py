@@ -171,6 +171,13 @@ def load_mock_adf_inventory(fixtures_root: Path) -> ADFInventory:
         datasets=datasets,
         data_flows=data_flows,
         triggers=triggers,
+        source_definitions={
+            "pipelines": pipelines_data,
+            "linked_services": linked_services_data,
+            "datasets": datasets_data,
+            "data_flows": dataflows_data,
+            "triggers": triggers_data,
+        },
     )
 
     logger.info(

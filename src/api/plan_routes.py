@@ -10,7 +10,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
-from src.api.routes import get_latest_discovery, get_latest_inventory
+from src.api.routes import get_latest_discovery_record, get_latest_inventory
 from src.migration.assessment_store import get_latest_assessment
 from src.migration.plan_store import get_latest_plan, get_plan, save_plan
 from src.migration.planner import MigrationPlanner
@@ -23,7 +23,8 @@ router = APIRouter(prefix="/api/plans", tags=["plans"])
 @router.post("/generate")
 async def generate_plan():
     """Generate and persist a migration plan from discovery + assessment."""
-    discovery = get_latest_discovery()
+    discovery_record = get_latest_discovery_record()
+    discovery = discovery_record["result"] if discovery_record else None
     inventory = get_latest_inventory()
     if discovery is None or inventory is None:
         raise HTTPException(
@@ -39,7 +40,7 @@ async def generate_plan():
         )
 
     plan = MigrationPlanner(inventory).generate_plan(
-        discovery, assessment_record["result"]
+        discovery, assessment_record["result"], discovery_record["id"]
     )
     record = save_plan(plan, assessment_id=assessment_record["id"])
 
@@ -57,6 +58,15 @@ async def generate_plan():
         "version": record["version"],
         "executable": record["executable"],
         "overall_risk": record["overall_risk"],
+        "package_id": (
+            plan.generated_package.package_id
+            if plan.generated_package else None
+        ),
+        "package_manifest_path": record.get("package_manifest_path"),
+        "generated_artifact_count": (
+            len(plan.generated_package.artifacts)
+            if plan.generated_package else 0
+        ),
         "summary": plan.summary.model_dump(mode="json"),
     }
 
@@ -71,6 +81,24 @@ async def latest_plan():
             detail="No plan has been generated yet. POST /api/plans/generate first.",
         )
     return _serialize(record)
+
+
+@router.get("/{plan_id}/package")
+async def plan_package(plan_id: int):
+    """Return the generated definition package for a persisted plan."""
+    record = get_plan(plan_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"Plan {plan_id} not found.")
+    package = record["plan"].generated_package
+    if package is None:
+        raise HTTPException(
+            status_code=404, detail=f"Plan {plan_id} has no generated package."
+        )
+    return {
+        "plan_id": plan_id,
+        "package_manifest_path": record.get("package_manifest_path"),
+        "package": package.model_dump(mode="json"),
+    }
 
 
 @router.get("/{plan_id}")
@@ -91,5 +119,6 @@ def _serialize(record: dict) -> dict:
         "executable": record["executable"],
         "overall_risk": record["overall_risk"],
         "created_at": record["created_at"],
+        "package_manifest_path": record.get("package_manifest_path"),
         "plan": record["plan"].model_dump(mode="json"),
     }

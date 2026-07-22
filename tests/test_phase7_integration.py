@@ -41,6 +41,9 @@ def test_phase7_api_flow():
     assert data["status"] == "SUCCEEDED"
     assert data["summary"]["resources_created"] == 0
     assert data["mode"] == "DRY_RUN"
+    assert len(data["steps"]) == 8
+    assert all(step["resource_id"] is None for step in data["steps"])
+    assert all(step["generated_definition"] for step in data["steps"])
     
     # 7. Start MOCK deployment
     payload["mode"] = "MOCK"
@@ -48,13 +51,24 @@ def test_phase7_api_flow():
     assert resp.status_code == 200
     data = resp.json()
     assert data["status"] == "SUCCEEDED"
-    assert data["summary"]["resources_created"] > 0
+    assert data["summary"]["resources_created"] == 8
     assert data["mode"] == "MOCK"
-    
-    # Check that VALIDATE step is deferred/skipped
-    validate_step = next((s for s in data["steps"] if s["action_type"] == "validate"), None)
-    assert validate_step is not None
-    assert validate_step["status"] == "SKIPPED"
+    assert data["package_id"].startswith("package-")
+    assert len(data["plan_fingerprint"]) == 64
+    assert all(step["action_type"] == "deploy_artifact" for step in data["steps"])
+    assert all(step["artifact_id"] for step in data["steps"])
+    assert all(len(step["content_digest"]) == 64 for step in data["steps"])
+    assert all(step["resource_id"] for step in data["steps"])
+
+    # Every artifact appears after its declared dependencies.
+    package = client.get(f"/api/plans/{plan_id}/package").json()["package"]
+    dependencies = {
+        artifact["artifact_id"]: artifact["dependencies"]
+        for artifact in package["artifacts"]
+    }
+    positions = {step["artifact_id"]: step["order"] for step in data["steps"]}
+    for artifact_id, required in dependencies.items():
+        assert all(positions[item] < positions[artifact_id] for item in required)
     
     # 8. Check endpoints
     resp = client.get("/api/deployments/latest")

@@ -38,6 +38,9 @@ def test_approval_flow():
     status = client.get(f"/api/plans/{plan_id}/approval-status").json()
     assert status["status"] == "PENDING"
     assert status["can_deploy"] is False
+    assert status["package"]["artifact_count"] == 8
+    assert len(status["package"]["package_digest"]) == 64
+    assert all(item["content_digest"] for item in status["package"]["artifacts"])
 
     # Approve -> deployment allowed.
     ok = client.post(f"/api/approvals/{approval_id}/approve", json={"user": "bob"})

@@ -52,6 +52,27 @@ class AppMetadata(Base):
         return f"<AppMetadata(key={self.key!r}, value={self.value!r})>"
 
 
+class DiscoveryRunRecord(Base):
+    """Persisted, lossless source-definition discovery snapshot."""
+
+    __tablename__ = "discovery_runs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    artifact_count = Column(Integer, nullable=False, default=0)
+    component_count = Column(Integer, nullable=False, default=0)
+    result_json = Column(Text, nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<DiscoveryRunRecord(id={self.id}, "
+            f"artifact_count={self.artifact_count}, "
+            f"component_count={self.component_count})>"
+        )
+
+
 class AssessmentRun(Base):
     """Persisted compatibility-assessment run (Phase 4).
 
@@ -157,6 +178,58 @@ class DeploymentRunRecord(Base):
             f"mode={self.mode!r}, status={self.status!r})>"
         )
 
+class ValidationRunRecord(Base):
+    """Persisted validation run (Phase 8)."""
+    __tablename__ = "validation_runs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    deployment_id = Column(Integer, nullable=False)
+    plan_id = Column(Integer, nullable=False)
+    status = Column(String(32), nullable=False)
+    result_json = Column(Text, nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    completed_at = Column(DateTime, nullable=True)
+
+    def __repr__(self) -> str:
+        return (
+            f"<ValidationRunRecord(id={self.id}, deployment_id={self.deployment_id}, "
+            f"status={self.status!r})>"
+        )
+
+
+class StructuralValidationRunRecord(Base):
+    """Persisted artifact-definition structural validation run."""
+
+    __tablename__ = "structural_validation_runs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    discovery_id = Column(Integer, nullable=False)
+    deployment_id = Column(Integer, nullable=False)
+    plan_id = Column(Integer, nullable=True)
+    status = Column(String(32), nullable=False)
+    result_json = Column(Text, nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    completed_at = Column(DateTime, nullable=True)
+
+
+class RuntimeValidationRunRecord(Base):
+    """Persisted optional customer-runtime metric validation run."""
+
+    __tablename__ = "runtime_validation_runs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    deployment_id = Column(Integer, nullable=False)
+    plan_id = Column(Integer, nullable=False)
+    status = Column(String(32), nullable=False)
+    result_json = Column(Text, nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    completed_at = Column(DateTime, nullable=True)
 
 # ── Engine & Session ─────────────────────────────────────────────
 

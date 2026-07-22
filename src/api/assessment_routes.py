@@ -9,7 +9,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
-from src.api.routes import get_latest_discovery, get_latest_inventory
+from src.api.routes import get_latest_discovery_record, get_latest_inventory
 from src.migration.assessment import ADFCompatibilityAssessment
 from src.migration.assessment_store import (
     get_assessment,
@@ -25,7 +25,8 @@ router = APIRouter(prefix="/api/assessment", tags=["assessment"])
 @router.post("/run")
 async def run_assessment():
     """Assess the latest discovery result and persist it."""
-    discovery = get_latest_discovery()
+    discovery_record = get_latest_discovery_record()
+    discovery = discovery_record["result"] if discovery_record else None
     inventory = get_latest_inventory()
     if discovery is None or inventory is None:
         raise HTTPException(
@@ -35,6 +36,7 @@ async def run_assessment():
 
     engine = ADFCompatibilityAssessment(inventory)
     result = engine.assess_discovery(discovery)
+    result.discovery_id = discovery_record["id"]
     assessment_id = save_assessment(result)
 
     return {

@@ -12,7 +12,13 @@ import logging
 from typing import Optional
 
 from src.approvals import approval_store
-from src.migration.plan_store import compute_plan_fingerprint, get_plan, list_plans
+from src.artifacts import ArtifactPackageError
+from src.migration.plan_store import (
+    compute_plan_package_fingerprint,
+    get_plan,
+    list_plans,
+    verify_plan_package,
+)
 from src.models.schemas import ApprovalResult, ApprovalStatus
 
 logger = logging.getLogger(__name__)
@@ -43,11 +49,17 @@ def request_approval(
             f"Plan {plan_id} is not executable and cannot be approved.",
             "NOT_EXECUTABLE",
         )
+    try:
+        verify_plan_package(plan)
+    except ArtifactPackageError as exc:
+        raise ApprovalError(
+            f"Plan {plan_id} package is invalid: {exc}", "PACKAGE_INVALID"
+        ) from exc
 
     # A newer version supersedes older approvals for the same assessment.
     invalidate_stale_approvals(plan_id)
 
-    fingerprint = compute_plan_fingerprint(plan)
+    fingerprint = compute_plan_package_fingerprint(plan)
     return approval_store.save_approval(
         plan_id=plan_id,
         plan_version=record["version"],
@@ -91,12 +103,24 @@ def _decide(
         raise ApprovalError(
             f"Plan {approval.plan_id} no longer exists.", "PLAN_NOT_FOUND"
         )
-    if compute_plan_fingerprint(record["plan"]) != approval.plan_fingerprint:
+    package_error = None
+    try:
+        verify_plan_package(record["plan"])
+    except ArtifactPackageError as exc:
+        package_error = exc
+    if (
+        package_error is not None
+        or compute_plan_package_fingerprint(record["plan"])
+        != approval.plan_fingerprint
+    ):
         approval_store.update_status(
             approval_id,
             ApprovalStatus.INVALIDATED,
             decided_by="system",
-            decision_comment="Plan changed before decision.",
+            decision_comment=(
+                "Generated package changed before decision."
+                if package_error else "Plan changed before decision."
+            ),
         )
         raise ApprovalError(
             "Plan changed since approval was requested; request invalidated.",
@@ -135,8 +159,13 @@ def invalidate_stale_approvals(plan_id: int) -> list[int]:
             continue
 
         superseded = approval.plan_version < latest_version
-        changed = (
-            compute_plan_fingerprint(appr_plan["plan"])
+        try:
+            verify_plan_package(appr_plan["plan"])
+            package_invalid = False
+        except ArtifactPackageError:
+            package_invalid = True
+        changed = package_invalid or (
+            compute_plan_package_fingerprint(appr_plan["plan"])
             != approval.plan_fingerprint
         )
         if superseded or changed:

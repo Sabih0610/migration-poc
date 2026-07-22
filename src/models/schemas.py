@@ -279,9 +279,53 @@ class ADFInventory(BaseModel):
     datasets: list[Dataset] = Field(default_factory=list)
     data_flows: list[MappingDataFlow] = Field(default_factory=list)
     triggers: list[Trigger] = Field(default_factory=list)
+    # Exact JSON objects loaded from the source.  The typed fields above make
+    # the definitions convenient to inspect; this payload guarantees that
+    # unknown ADF properties survive discovery without normalization loss.
+    source_definitions: dict[str, list[dict[str, Any]]] = Field(
+        default_factory=dict
+    )
 
 
 # ── Discovery Result Models (Phase 3) ───────────────────────────
+
+
+class SourceExpression(BaseModel):
+    """An expression found within a source artifact or component."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    source_reference: str
+    property_path: str
+    value: Any
+    expression_type: str = "Expression"
+
+
+class ConnectionReference(BaseModel):
+    """A source artifact reference to a linked service/connection."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    source_reference: str
+    connection_name: str
+    reference_type: str = "LinkedServiceReference"
+    property_path: str = ""
+
+
+class DiscoveredComponent(BaseModel):
+    """A nested, non-deployable activity or transformation definition."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    component_id: str
+    component_type: str = Field(..., description="activity|transformation")
+    component_name: str
+    parent_reference: str
+    property_path: str
+    order: int = 0
+    definition: dict[str, Any] = Field(default_factory=dict)
+    expressions: list[SourceExpression] = Field(default_factory=list)
+    dependencies: list[str] = Field(default_factory=list)
 
 
 class DiscoveredAsset(BaseModel):
@@ -293,6 +337,9 @@ class DiscoveredAsset(BaseModel):
     asset_name: str
     parent: Optional[str] = Field(default=None, description="Parent asset name (e.g. pipeline for activity)")
     metadata: dict[str, Any] = Field(default_factory=dict)
+    source_reference: str = ""
+    definition: dict[str, Any] = Field(default_factory=dict)
+    is_component: bool = False
 
 
 class DependencyEdge(BaseModel):
@@ -338,6 +385,10 @@ class DiscoverySummary(BaseModel):
     trigger_count: int = 0
     dependency_count: int = 0
     missing_dependency_count: int = 0
+    artifact_count: int = 0
+    component_count: int = 0
+    expression_count: int = 0
+    connection_reference_count: int = 0
 
 
 class DiscoveryResult(BaseModel):
@@ -349,6 +400,10 @@ class DiscoveryResult(BaseModel):
     dependencies: list[DependencyEdge] = Field(default_factory=list)
     missing_dependencies: list[MissingDependency] = Field(default_factory=list)
     summary: DiscoverySummary = Field(default_factory=DiscoverySummary)
+    inventory: ADFInventory = Field(default_factory=ADFInventory)
+    components: list[DiscoveredComponent] = Field(default_factory=list)
+    expressions: list[SourceExpression] = Field(default_factory=list)
+    connection_references: list[ConnectionReference] = Field(default_factory=list)
 
 
 # ── Assessment Models (Phase 4) ─────────────────────────────────
@@ -477,6 +532,7 @@ class AssessmentResult(BaseModel):
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
+    discovery_id: Optional[int] = None
     overall_status: AssessmentStatus = AssessmentStatus.READY
     assessments: list[AssetAssessment] = Field(default_factory=list)
     summary: AssessmentSummary = Field(default_factory=AssessmentSummary)
@@ -496,6 +552,110 @@ class TargetItemType(str, Enum):
     DATA_PIPELINE = "FabricDataPipeline"
     SCHEDULE = "FabricSchedule"
     NONE = "None"
+
+
+class DeployableTargetType(str, Enum):
+    """Fabric item types that may appear in a generated artifact package."""
+
+    CONNECTION = "FabricConnection"
+    LAKEHOUSE = "Lakehouse"
+    LAKEHOUSE_TABLE = "LakehouseTable"
+    DATAFLOW_GEN2 = "DataflowGen2"
+    DATA_PIPELINE = "FabricDataPipeline"
+    SCHEDULE = "FabricSchedule"
+
+
+class ConversionDisposition(str, Enum):
+    """How a source property is represented in a generated definition."""
+
+    PRESERVED = "PRESERVED"
+    RENAMED = "RENAMED"
+    CONVERTED = "CONVERTED"
+    UNSUPPORTED = "UNSUPPORTED"
+    MANUAL = "MANUAL"
+    OMITTED_WITH_REASON = "OMITTED_WITH_REASON"
+
+
+class PropertyConversion(BaseModel):
+    """Traceability record for one source-to-target property conversion."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    source_path: str
+    target_path: Optional[str] = None
+    disposition: ConversionDisposition
+    source_value: Any = None
+    target_value: Any = None
+    note: str = ""
+
+
+class DefinitionSchemaResult(BaseModel):
+    """Result of validating a generated definition against its schema."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    valid: bool
+    schema_name: str = ""
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class GeneratedArtifact(BaseModel):
+    """Concrete generated Fabric artifact definition and its traceability."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    artifact_id: str
+    source_reference: str
+    target_type: DeployableTargetType
+    target_name: str
+    generated_definition: dict[str, Any]
+    conversion_notes: list[PropertyConversion] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    unsupported_properties: list[str] = Field(default_factory=list)
+    manual_actions: list[str] = Field(default_factory=list)
+    dependencies: list[str] = Field(default_factory=list)
+    connection_references: list[str] = Field(default_factory=list)
+    content_digest: str
+
+
+class ManifestEntry(BaseModel):
+    """Index entry for one generated artifact file."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    artifact_id: str
+    target_type: DeployableTargetType
+    target_name: str
+    relative_path: str
+    content_digest: str
+    dependencies: list[str] = Field(default_factory=list)
+
+
+class ArtifactManifest(BaseModel):
+    """Deterministic index of a generated artifact package."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    package_id: str
+    schema_version: str = "1.0"
+    plan_id: Optional[int] = None
+    plan_version: Optional[int] = None
+    entries: list[ManifestEntry] = Field(default_factory=list)
+    package_digest: str = ""
+
+
+class GeneratedArtifactPackage(BaseModel):
+    """A collection of generated definitions and its manifest."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    package_id: str
+    artifacts: list[GeneratedArtifact] = Field(default_factory=list)
+    manifest: ArtifactManifest
+    # Runtime location only: never serialized into plans, packages, or
+    # approval fingerprints because it is machine-specific.
+    output_directory: Optional[str] = Field(default=None, exclude=True)
 
 
 class MigrationActionType(str, Enum):
@@ -626,6 +786,7 @@ class MigrationPlanSummary(BaseModel):
     action_count: int = 0
     manual_action_count: int = 0
     validation_rule_count: int = 0
+    generated_artifact_count: int = 0
     executable: bool = True
     overall_risk: MigrationRisk = MigrationRisk.LOW
     risk_counts: dict[str, int] = Field(default_factory=dict)
@@ -637,6 +798,7 @@ class MigrationPlan(BaseModel):
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
+    discovery_id: Optional[int] = None
     executable: bool = True
     overall_risk: MigrationRisk = MigrationRisk.LOW
     assessment_status: AssessmentStatus = AssessmentStatus.READY
@@ -644,6 +806,7 @@ class MigrationPlan(BaseModel):
     actions: list[MigrationAction] = Field(default_factory=list)
     manual_actions: list[ManualAction] = Field(default_factory=list)
     validation_rules: list[ValidationRule] = Field(default_factory=list)
+    generated_package: Optional[GeneratedArtifactPackage] = None
     summary: MigrationPlanSummary = Field(default_factory=MigrationPlanSummary)
 
 
@@ -748,8 +911,11 @@ class DeploymentStepResult(BaseModel):
 
     order: int
     action_type: str
+    artifact_id: Optional[str] = None
     target_item_type: str
     target_item_name: str
+    content_digest: Optional[str] = None
+    generated_definition: Optional[dict[str, Any]] = None
     status: DeploymentStepStatus
     resource_id: Optional[str] = None
     message: str = ""
@@ -778,6 +944,8 @@ class DeploymentResult(BaseModel):
     deployment_id: Optional[int] = None
     plan_id: int
     approval_id: int
+    package_id: Optional[str] = None
+    plan_fingerprint: Optional[str] = None
     mode: DeploymentMode
     status: DeploymentStatus
     steps: list[DeploymentStepResult] = Field(default_factory=list)
@@ -785,3 +953,117 @@ class DeploymentResult(BaseModel):
     error: Optional[str] = None
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
+
+# ── Phase 8: Validation & Reporting ──────────────────────────────
+
+class ValidationStatus(str, Enum):
+    PASSED = "PASSED"
+    PASSED_WITH_WARNINGS = "PASSED_WITH_WARNINGS"
+    FAILED = "FAILED"
+
+class CheckStatus(str, Enum):
+    PASSED = "PASSED"
+    WARNING = "WARNING"
+    FAILED = "FAILED"
+    SKIPPED = "SKIPPED"
+
+class DatasetMetrics(BaseModel):
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+    row_count: Optional[int] = None
+    schema_hash: Optional[str] = None
+    gross_total: Optional[float] = None
+    discount_total: Optional[float] = None
+    net_total: Optional[float] = None
+    customer_region_totals: Optional[dict[str, float]] = None
+    rejected_count: Optional[int] = None
+    runtime_seconds: Optional[float] = None
+    run_status: Optional[str] = None
+    error: Optional[str] = None
+
+class ValidationCheckResult(BaseModel):
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+    rule_name: str
+    rule_type: str
+    status: CheckStatus
+    source_value: Any = None
+    target_value: Any = None
+    message: Optional[str] = None
+
+class ValidationSummary(BaseModel):
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+    total_checks: int = 0
+    passed: int = 0
+    warnings: int = 0
+    failed: int = 0
+    skipped: int = 0
+
+class ValidationResult(BaseModel):
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+    validation_id: Optional[int] = None
+    deployment_id: int
+    plan_id: int
+    status: ValidationStatus
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    summary: ValidationSummary
+    source_metrics: dict[str, DatasetMetrics] = Field(default_factory=dict)
+    target_metrics: dict[str, DatasetMetrics] = Field(default_factory=dict)
+    checks: list[ValidationCheckResult] = Field(default_factory=list)
+
+
+class StructuralValidationCheck(BaseModel):
+    """One traceable artifact-definition validation assertion."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    category: str
+    status: CheckStatus
+    message: str
+    source_reference: Optional[str] = None
+    target_artifact_id: Optional[str] = None
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class StructuralValidationSummary(BaseModel):
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    total_checks: int = 0
+    passed: int = 0
+    warnings: int = 0
+    failed: int = 0
+    skipped: int = 0
+    category_counts: dict[str, int] = Field(default_factory=dict)
+
+
+class StructuralValidationResult(BaseModel):
+    """Comparison of source snapshot, approved package, and deployment."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    validation_id: Optional[int] = None
+    discovery_id: int
+    deployment_id: int
+    plan_id: int
+    approval_id: int
+    package_fingerprint: str
+    status: ValidationStatus
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    summary: StructuralValidationSummary
+    checks: list[StructuralValidationCheck] = Field(default_factory=list)
+
+class MigrationReport(BaseModel):
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+    report_id: str
+    generated_at: str
+    workflow_stages: dict[str, Any] = Field(default_factory=dict)
+    source_artifacts: list[Any] = Field(default_factory=list)
+    generated_artifacts: list[Any] = Field(default_factory=list)
+    mappings: list[Any] = Field(default_factory=list)
+    property_conversions: list[Any] = Field(default_factory=list)
+    unsupported_properties: list[Any] = Field(default_factory=list)
+    manual_actions: list[Any] = Field(default_factory=list)
+    approval: Any = None
+    deployment: Any = None
+    structural_validation: StructuralValidationResult
+    runtime_validation: Any = None

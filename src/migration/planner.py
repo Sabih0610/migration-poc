@@ -12,11 +12,15 @@ import logging
 from typing import NamedTuple, Optional
 
 from src.migration import planning_rules as pr
+from src.artifacts import build_package
 from src.models.schemas import (
     ADFInventory,
     AssessmentResult,
     AssessmentStatus,
     DiscoveryResult,
+    DeployableTargetType,
+    GeneratedArtifact,
+    GeneratedArtifactPackage,
     ManualAction,
     MigrationAction,
     MigrationActionType,
@@ -58,14 +62,21 @@ class MigrationPlanner:
         self._status: dict[str, AssessmentStatus] = {}
         self._source_refs: set[str] = set()
         self._sink_refs: set[str] = set()
+        self._assessment_by_name = {}
 
     # ── Orchestration ────────────────────────────────────────────
 
     def generate_plan(
-        self, discovery: DiscoveryResult, assessment: AssessmentResult
+        self,
+        discovery: DiscoveryResult,
+        assessment: AssessmentResult,
+        discovery_id: Optional[int] = None,
     ) -> MigrationPlan:
         """Generate the full migration plan (deterministic)."""
         self._status = {a.asset_name: a.status for a in assessment.assessments}
+        self._assessment_by_name = {
+            a.asset_name: a for a in assessment.assessments
+        }
         self._compute_roles()
         self._entries = self._collect_entries()
 
@@ -73,6 +84,7 @@ class MigrationPlanner:
         actions = self.create_actions()
         manual_actions = self.create_manual_actions()
         validation_rules = self.create_validation_rules()
+        generated_package = self.create_generated_package()
 
         executable = not any(
             AssessmentStatus(e.status) == AssessmentStatus.BLOCKED
@@ -81,6 +93,7 @@ class MigrationPlanner:
         overall_risk = self.calculate_risk(actions, executable)
         summary = self.create_summary(
             mappings, actions, manual_actions, validation_rules,
+            generated_package,
             executable, overall_risk,
         )
 
@@ -92,6 +105,7 @@ class MigrationPlanner:
         )
 
         return MigrationPlan(
+            discovery_id=discovery_id or assessment.discovery_id,
             executable=executable,
             overall_risk=overall_risk,
             assessment_status=assessment.overall_status,
@@ -99,8 +113,203 @@ class MigrationPlanner:
             actions=actions,
             manual_actions=manual_actions,
             validation_rules=validation_rules,
+            generated_package=generated_package,
             summary=summary,
         )
+
+    # ── Concrete generated definitions ───────────────────────────────
+
+    def create_generated_package(self) -> GeneratedArtifactPackage:
+        """Generate concrete, deterministic Fabric artifact definitions."""
+        artifacts: list[GeneratedArtifact] = []
+
+        connection_ids = {
+            linked_service.name: f"connection:{linked_service.name}"
+            for linked_service in self.inventory.linked_services
+        }
+        for linked_service in self.inventory.linked_services:
+            spec = pr.connection_definition(linked_service)
+            artifacts.append(
+                self._generated_artifact(
+                    spec,
+                    artifact_id=connection_ids[linked_service.name],
+                    source_reference=f"linked_service:{linked_service.name}",
+                    target_type=DeployableTargetType.CONNECTION,
+                    target_name=linked_service.name,
+                    source_names=[linked_service.name],
+                )
+            )
+
+        sink_datasets = [
+            dataset for dataset in self.inventory.datasets
+            if dataset.name in self._sink_refs
+        ]
+        lakehouse_id = f"lakehouse:{LAKEHOUSE_NAME}"
+        if sink_datasets:
+            artifacts.append(
+                self._generated_artifact(
+                    pr.lakehouse_definition(LAKEHOUSE_NAME),
+                    artifact_id=lakehouse_id,
+                    source_reference="migration:output_datasets",
+                    target_type=DeployableTargetType.LAKEHOUSE,
+                    target_name=LAKEHOUSE_NAME,
+                    source_names=[dataset.name for dataset in sink_datasets],
+                )
+            )
+
+        table_ids: dict[str, str] = {}
+        for dataset in sink_datasets:
+            table_name = self._table_name(dataset.name)
+            artifact_id = f"lakehouse_table:{table_name}"
+            table_ids[dataset.name] = artifact_id
+            connection_refs = self._dataset_connection_ids(
+                dataset.name, connection_ids
+            )
+            artifacts.append(
+                self._generated_artifact(
+                    pr.lakehouse_table_definition(
+                        dataset, table_name, LAKEHOUSE_NAME
+                    ),
+                    artifact_id=artifact_id,
+                    source_reference=f"dataset:{dataset.name}",
+                    target_type=DeployableTargetType.LAKEHOUSE_TABLE,
+                    target_name=table_name,
+                    dependencies=[lakehouse_id],
+                    connection_references=connection_refs,
+                    source_names=[dataset.name],
+                )
+            )
+
+        dataflow_ids = {
+            dataflow.name: f"dataflow:{dataflow.name}"
+            for dataflow in self.inventory.data_flows
+        }
+        all_connection_ids = sorted(connection_ids.values())
+        for dataflow in self.inventory.data_flows:
+            dependencies = sorted(
+                set(all_connection_ids) | set(table_ids.values())
+            )
+            artifacts.append(
+                self._generated_artifact(
+                    pr.dataflow_definition(dataflow, all_connection_ids),
+                    artifact_id=dataflow_ids[dataflow.name],
+                    source_reference=f"data_flow:{dataflow.name}",
+                    target_type=DeployableTargetType.DATAFLOW_GEN2,
+                    target_name=dataflow.name,
+                    dependencies=dependencies,
+                    connection_references=all_connection_ids,
+                    source_names=[dataflow.name],
+                )
+            )
+
+        pipeline_ids = {
+            pipeline.name: f"pipeline:{pipeline.name}"
+            for pipeline in self.inventory.pipelines
+        }
+        for pipeline in self.inventory.pipelines:
+            activity_names = [
+                activity.name
+                for activity in self._walk_activities(
+                    pipeline.properties.activities
+                )
+            ]
+            artifacts.append(
+                self._generated_artifact(
+                    pr.pipeline_definition(pipeline),
+                    artifact_id=pipeline_ids[pipeline.name],
+                    source_reference=f"pipeline:{pipeline.name}",
+                    target_type=DeployableTargetType.DATA_PIPELINE,
+                    target_name=pipeline.name,
+                    dependencies=sorted(dataflow_ids.values()),
+                    source_names=[pipeline.name, *activity_names],
+                )
+            )
+
+        default_pipeline = (
+            self.inventory.pipelines[0].name
+            if self.inventory.pipelines else "pipeline"
+        )
+        for trigger in self.inventory.triggers:
+            pipeline_name = default_pipeline
+            if (
+                trigger.properties.pipelines
+                and trigger.properties.pipelines[0].pipeline_reference
+            ):
+                pipeline_name = (
+                    trigger.properties.pipelines[0]
+                    .pipeline_reference.reference_name
+                )
+            dependency = pipeline_ids.get(
+                pipeline_name, f"pipeline:{pipeline_name}"
+            )
+            artifacts.append(
+                self._generated_artifact(
+                    pr.schedule_definition(trigger, pipeline_name),
+                    artifact_id=f"schedule:{trigger.name}",
+                    source_reference=f"trigger:{trigger.name}",
+                    target_type=DeployableTargetType.SCHEDULE,
+                    target_name=trigger.name,
+                    dependencies=[dependency],
+                    source_names=[trigger.name],
+                )
+            )
+
+        return build_package(artifacts)
+
+    def _generated_artifact(
+        self,
+        spec: pr.DefinitionSpec,
+        artifact_id: str,
+        source_reference: str,
+        target_type: DeployableTargetType,
+        target_name: str,
+        dependencies: Optional[list[str]] = None,
+        connection_references: Optional[list[str]] = None,
+        source_names: Optional[list[str]] = None,
+    ) -> GeneratedArtifact:
+        warnings = list(spec.warnings)
+        unsupported = list(spec.unsupported_properties)
+        manual = list(spec.manual_actions)
+        for source_name in source_names or []:
+            assessment = self._assessment_by_name.get(source_name)
+            if assessment is None:
+                continue
+            for issue in assessment.issues:
+                if issue.status != AssessmentStatus.READY:
+                    warnings.append(f"{issue.rule_id}: {issue.message}")
+                if issue.status in (
+                    AssessmentStatus.UNSUPPORTED,
+                    AssessmentStatus.BLOCKED,
+                ):
+                    unsupported.append(issue.rule_id)
+                if issue.manual_review or issue.blocking:
+                    manual.append(issue.recommended_action)
+        return GeneratedArtifact(
+            artifact_id=artifact_id,
+            source_reference=source_reference,
+            target_type=target_type,
+            target_name=target_name,
+            generated_definition=spec.definition,
+            conversion_notes=spec.conversions,
+            warnings=sorted(set(filter(None, warnings))),
+            unsupported_properties=sorted(set(filter(None, unsupported))),
+            manual_actions=sorted(set(filter(None, manual))),
+            dependencies=sorted(set(dependencies or [])),
+            connection_references=sorted(set(connection_references or [])),
+            content_digest="",
+        )
+
+    def _dataset_connection_ids(
+        self, dataset_name: str, connection_ids: dict[str, str]
+    ) -> list[str]:
+        dataset = next(
+            (item for item in self.inventory.datasets if item.name == dataset_name),
+            None,
+        )
+        if dataset is None or dataset.properties.linked_service_name is None:
+            return []
+        connection_name = dataset.properties.linked_service_name.reference_name
+        return [connection_ids[connection_name]] if connection_name in connection_ids else []
 
     # ── Source→target mapping ────────────────────────────────────
 
@@ -347,6 +556,19 @@ class MigrationPlanner:
             )
         )
 
+        # Runtime comparison (warning only)
+        rules.append(
+            ValidationRule(
+                name="pipeline_runtime",
+                rule_type="runtime",
+                source=f"adf:{pipeline_name}.runtime",
+                target=f"fabric:{pipeline_name}.runtime",
+                comparison="within_tolerance",
+                tolerance=0.2, # 20% tolerance
+                blocking=False, # warning only
+            )
+        )
+
         return rules
 
     # ── Risk & summary ───────────────────────────────────────────
@@ -367,6 +589,7 @@ class MigrationPlanner:
         actions: list[MigrationAction],
         manual_actions: list[ManualAction],
         validation_rules: list[ValidationRule],
+        generated_package: GeneratedArtifactPackage,
         executable: bool,
         overall_risk: MigrationRisk,
     ) -> MigrationPlanSummary:
@@ -387,6 +610,7 @@ class MigrationPlanner:
             action_count=len(actions),
             manual_action_count=len(manual_actions),
             validation_rule_count=len(validation_rules),
+            generated_artifact_count=len(generated_package.artifacts),
             executable=executable,
             overall_risk=overall_risk,
             risk_counts=risk_counts,

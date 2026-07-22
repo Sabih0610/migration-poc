@@ -72,11 +72,12 @@ def _run() -> int:
         else:
             errors.append("MOCK deployment failed to create resources")
             
-        validate_step = next((s for s in data["steps"] if s["action_type"] == "validate"), None)
-        if validate_step and validate_step["status"] == "SKIPPED":
-            passed.append("Validate step deferred")
+        if len(data["steps"]) == 8 and all(
+            step["action_type"] == "deploy_artifact" for step in data["steps"]
+        ):
+            passed.append("All generated definitions deployed")
         else:
-            errors.append("Validate step was not deferred")
+            errors.append("Deployment did not execute the 8 generated artifacts")
             
         # Check order
         steps = data["steps"]
@@ -112,7 +113,7 @@ def _run() -> int:
     
     if fail_res.status == DeploymentStatus.PARTIAL or fail_res.status == DeploymentStatus.FAILED:
         failed_step = next((s for s in fail_res.steps if s.status == DeploymentStepStatus.FAILED), None)
-        if failed_step and failed_step.action_type == "create_table":
+        if failed_step and failed_step.target_item_type == "LakehouseTable":
             passed.append("Injected failure recorded on create_table")
             
             # Ensure subsequent steps are skipped

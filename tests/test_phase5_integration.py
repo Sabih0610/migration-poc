@@ -50,7 +50,10 @@ def test_full_flow_scan_assess_plan():
     assert body["overall_risk"] == "MEDIUM"
     assert body["summary"]["total_source_assets"] == 14
     assert body["summary"]["action_count"] == 11
-    assert body["summary"]["validation_rule_count"] == 9
+    assert body["summary"]["validation_rule_count"] == 10
+    assert body["generated_artifact_count"] == 8
+    assert body["package_id"].startswith("package-")
+    assert body["package_manifest_path"].startswith("manifests/")
     plan_id = body["plan_id"]
 
     # Latest returns the same plan.
@@ -63,6 +66,11 @@ def test_full_flow_scan_assess_plan():
     assert by_id.status_code == 200
     assert by_id.json()["plan"]["executable"] is True
     assert len(by_id.json()["plan"]["actions"]) == 11
+    assert len(by_id.json()["plan"]["generated_package"]["artifacts"]) == 8
+
+    package = client.get(f"/api/plans/{plan_id}/package")
+    assert package.status_code == 200
+    assert len(package.json()["package"]["artifacts"]) == 8
 
 
 def test_version_increments_via_api():
