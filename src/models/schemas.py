@@ -1067,3 +1067,141 @@ class MigrationReport(BaseModel):
     deployment: Any = None
     structural_validation: StructuralValidationResult
     runtime_validation: Any = None
+    runtime_execution_validation: Any = None
+
+
+# ── Phase 11: Controlled execution + runtime-equivalence validation ─────
+
+
+class ExecutionSide(str, Enum):
+    """Which side of the migration a controlled execution ran on."""
+
+    SOURCE = "source"
+    TARGET = "target"
+
+
+class ExecutionStatus(str, Enum):
+    """Lifecycle state of one controlled pipeline execution."""
+
+    QUEUED = "QUEUED"
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    TIMED_OUT = "TIMED_OUT"
+    CANCELLED = "CANCELLED"
+
+
+class RuntimeMetrics(BaseModel):
+    """Safe, structure-only runtime metrics for one execution.
+
+    Deliberately has no free-form raw-row field: only counts, schema
+    structure, and configured aggregate totals are ever collected.
+    """
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    status: Optional[str] = None
+    schemas: dict[str, str] = Field(default_factory=dict)
+    total_row_count: Optional[int] = None
+    valid_row_count: Optional[int] = None
+    rejected_row_count: Optional[int] = None
+    numeric_totals: dict[str, float] = Field(default_factory=dict)
+    grouped_totals: dict[str, dict[str, float]] = Field(default_factory=dict)
+    null_counts: dict[str, int] = Field(default_factory=dict)
+    duplicate_counts: dict[str, int] = Field(default_factory=dict)
+    duration_seconds: Optional[float] = None
+
+
+class PipelineExecutionResult(BaseModel):
+    """Safe metadata + collected metrics for one controlled execution."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    execution_id: Optional[int] = None
+    correlation_id: str
+    side: ExecutionSide
+    pipeline_identity: str
+    run_id: Optional[str] = None
+    plan_id: Optional[int] = None
+    deployment_id: Optional[int] = None
+    discovery_snapshot_id: Optional[int] = None
+    status: ExecutionStatus
+    safe_error_category: Optional[str] = None
+    safe_error_message: Optional[str] = None
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    duration_seconds: Optional[float] = None
+    metrics: Optional[RuntimeMetrics] = None
+
+
+class RuntimeValidationRuleConfig(BaseModel):
+    """Safe, config-only comparison rules (column names / aggregate types)."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    required_metrics: list[str] = Field(default_factory=list)
+    row_count_tolerance: int = 0
+    numeric_total_tolerance: float = 0.0
+    grouped_total_tolerance: float = 0.0
+    allow_duration_warning: bool = True
+    duration_tolerance_pct: float = 0.2
+
+
+class RuntimeValidationStatus(str, Enum):
+    """Overall (and per-check) outcome of a runtime-equivalence validation."""
+
+    PASS = "PASS"
+    PASS_WITH_WARNINGS = "PASS_WITH_WARNINGS"
+    FAIL = "FAIL"
+    NOT_RUN = "NOT_RUN"
+    INCONCLUSIVE = "INCONCLUSIVE"
+
+
+class RuntimeValidationCheckResult(BaseModel):
+    """One traceable runtime-metric comparison assertion."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    name: str
+    status: RuntimeValidationStatus
+    source_value: Any = None
+    target_value: Any = None
+    tolerance: Optional[float] = None
+    explanation: str = ""
+
+
+class RuntimeValidationSummary(BaseModel):
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    total_checks: int = 0
+    passed: int = 0
+    warnings: int = 0
+    failed: int = 0
+    inconclusive: int = 0
+
+
+class RuntimeValidationResult(BaseModel):
+    """Optional, execution-linked runtime-equivalence validation result.
+
+    Strictly additive to structural validation: running or failing a
+    runtime validation must never modify structural validation status.
+    """
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    validation_id: Optional[int] = None
+    discovery_snapshot_id: Optional[int] = None
+    plan_id: int
+    plan_version: int
+    package_fingerprint: str
+    deployment_id: int
+    source_execution_id: int
+    source_run_id: Optional[str] = None
+    target_execution_id: int
+    target_run_id: Optional[str] = None
+    correlation_id: str
+    status: RuntimeValidationStatus
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    summary: RuntimeValidationSummary = Field(default_factory=RuntimeValidationSummary)
+    checks: list[RuntimeValidationCheckResult] = Field(default_factory=list)

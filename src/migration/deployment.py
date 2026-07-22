@@ -1,8 +1,9 @@
-"""Package-aware mock Fabric deployment engine.
+"""Package-aware Fabric deployment engine.
 
 Deploys approved generated definitions in dependency order. DRY_RUN performs
-schema/authorization checks but creates nothing; MOCK uses only the in-memory
-definition-aware connector; REAL remains disabled.
+schema/authorization checks but creates nothing; MOCK uses the in-memory
+definition-aware connector; REAL uses the read/write Fabric connector and
+only runs when Fabric deployment is explicitly enabled and configured.
 """
 
 import logging
@@ -13,9 +14,16 @@ from src.approvals.deployment_guard import (
     DeploymentAuthorizationError,
     validate_deployment_authorization,
 )
+from src.artifacts import ArtifactPackageError
+from src.config import get_settings
+from src.connectors.fabric_client import (
+    FabricClient,
+    FabricError,
+    build_fabric_client_from_settings,
+)
 from src.connectors.mock_fabric_client import MockFabricClient, MockFabricError
 from src.migration.deployment_store import save_deployment
-from src.migration.plan_store import get_plan
+from src.migration.plan_store import get_plan, verify_plan_package
 from src.models.schemas import (
     DeploymentMode,
     DeploymentResult,
@@ -30,7 +38,11 @@ logger = logging.getLogger(__name__)
 
 
 class RealModeNotImplementedError(Exception):
-    """Raised when REAL deployment mode is requested."""
+    """Kept for backward compatibility; REAL mode is now implemented."""
+
+
+class FabricDeploymentDisabledError(Exception):
+    """Raised when REAL deployment is requested but not enabled/configured."""
 
 
 def _now() -> str:
@@ -71,21 +83,40 @@ def artifact_dependency_order(
 
 
 class DeploymentService:
-    """Deploy approved generated definitions to the mock connector."""
+    """Deploy approved generated definitions to a mock or real connector."""
 
-    def __init__(self, connector: Optional[MockFabricClient] = None):
+    def __init__(
+        self,
+        connector: Optional[MockFabricClient] = None,
+        fabric_client: Optional[FabricClient] = None,
+    ):
         self._connector = connector
+        self._fabric_client = fabric_client
+
+    def _resolve_real_client(self) -> FabricClient:
+        """Return the injected/real Fabric client or fail if not enabled."""
+        if self._fabric_client is not None:
+            return self._fabric_client
+        settings = get_settings()
+        if not settings.fabric_deployment_ready():
+            raise FabricDeploymentDisabledError(
+                "REAL deployment requires FABRIC_DEPLOYMENT_ENABLED=true and "
+                "full Fabric configuration."
+            )
+        return build_fabric_client_from_settings(settings)
 
     def deploy(
         self, plan_id: int, approval_id: int, mode: DeploymentMode
     ) -> DeploymentResult:
         mode = DeploymentMode(mode)
-        if mode == DeploymentMode.REAL:
-            raise RealModeNotImplementedError(
-                "REAL deployment mode is not implemented yet."
-            )
-
         started = _now()
+
+        # REAL client is resolved up front so a disabled/misconfigured
+        # environment fails before any authorization or package work.
+        real_client = None
+        if mode == DeploymentMode.REAL:
+            real_client = self._resolve_real_client()  # raises if disabled
+
         try:
             authorization = validate_deployment_authorization(
                 plan_id, approval_id
@@ -103,6 +134,20 @@ class DeploymentService:
 
         plan = get_plan(plan_id)["plan"]
         package = plan.generated_package
+
+        # For REAL, re-read + verify the persisted package immediately
+        # before deployment: reject missing/modified/unexpected files.
+        if mode == DeploymentMode.REAL:
+            try:
+                verify_plan_package(plan)
+            except (ArtifactPackageError, Exception) as exc:
+                return self._finish(
+                    plan_id, approval_id, mode, DeploymentStatus.BLOCKED, [],
+                    started, error=f"PACKAGE_VERIFICATION_FAILED: {exc}",
+                    package_id=package.package_id if package else None,
+                    plan_fingerprint=authorization.plan_fingerprint,
+                )
+
         try:
             artifacts = artifact_dependency_order(package.artifacts)
         except ValueError as exc:
@@ -123,6 +168,7 @@ class DeploymentService:
             client = self._connector or MockFabricClient()
 
         steps: list[DeploymentStepResult] = []
+        dependency_ids: dict[str, str] = {}
         failed = False
         for order, artifact in enumerate(artifacts, start=1):
             if failed:
@@ -142,28 +188,61 @@ class DeploymentService:
                 )
                 continue
             try:
-                resource_id = client.deploy_artifact(artifact)
-                steps.append(
-                    self._step(
-                        order,
-                        artifact,
-                        DeploymentStepStatus.SUCCEEDED,
-                        resource_id=resource_id,
-                        message=(
-                            f"Deployed {artifact.target_type.value} "
-                            f"'{artifact.target_name}'."
-                        ),
+                if mode == DeploymentMode.REAL:
+                    outcome = real_client.deploy_artifact(artifact, dependency_ids)
+                    if outcome.item_id:
+                        dependency_ids[artifact.artifact_id] = outcome.item_id
+                    if outcome.status == "deferred":
+                        verb = "Deferred to runtime"
+                    elif outcome.reused:
+                        verb = "Reused"
+                    else:
+                        verb = "Created"
+                    steps.append(
+                        self._step(
+                            order,
+                            artifact,
+                            DeploymentStepStatus.SUCCEEDED,
+                            resource_id=outcome.item_id,
+                            reused=outcome.reused,
+                            materialization_status=outcome.materialization_status,
+                            readback_status=outcome.readback_status,
+                            readback_digest=outcome.readback_digest,
+                            message=(
+                                f"{verb} {artifact.target_type.value} "
+                                f"'{artifact.target_name}'."
+                            ),
+                        )
                     )
-                )
-            except MockFabricError as exc:
+                else:
+                    resource_id = client.deploy_artifact(artifact)
+                    steps.append(
+                        self._step(
+                            order,
+                            artifact,
+                            DeploymentStepStatus.SUCCEEDED,
+                            resource_id=resource_id,
+                            message=(
+                                f"Deployed {artifact.target_type.value} "
+                                f"'{artifact.target_name}'."
+                            ),
+                        )
+                    )
+            except (MockFabricError, FabricError) as exc:
                 failed = True
+                code = getattr(exc, "code", None)
                 steps.append(
                     self._step(
                         order,
                         artifact,
                         DeploymentStepStatus.FAILED,
-                        message="Artifact deployment failed.",
-                        error=str(exc),
+                        message=(
+                            "Artifact is not deployable."
+                            if code == "FABRIC_ARTIFACT_NON_DEPLOYABLE"
+                            else "Artifact deployment failed."
+                        ),
+                        error=f"{code}: {exc}" if code else str(exc),
+                        non_deployable=(code == "FABRIC_ARTIFACT_NON_DEPLOYABLE"),
                     )
                 )
 
@@ -186,6 +265,11 @@ class DeploymentService:
         resource_id: Optional[str] = None,
         message: str = "",
         error: Optional[str] = None,
+        reused: Optional[bool] = None,
+        materialization_status: Optional[str] = None,
+        readback_status: Optional[str] = None,
+        readback_digest: Optional[str] = None,
+        non_deployable: Optional[bool] = None,
     ) -> DeploymentStepResult:
         return DeploymentStepResult(
             order=order,
@@ -199,6 +283,11 @@ class DeploymentService:
             resource_id=resource_id,
             message=message,
             error=error,
+            reused=reused,
+            materialization_status=materialization_status,
+            readback_status=readback_status,
+            readback_digest=readback_digest,
+            non_deployable=non_deployable,
         )
 
     @classmethod

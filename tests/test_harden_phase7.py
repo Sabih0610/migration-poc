@@ -59,6 +59,8 @@ def test_verify_scripts_leave_main_db_unchanged():
         "verify_phase8_packages.py",
         "verify_phase8_deployment.py",
         "verify_phase8_structural.py",
+        "verify_phase10_deployment.py",
+        "verify_phase10_corrected.py",
     ]
     
     for script in scripts:

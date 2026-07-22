@@ -10,7 +10,7 @@ from src.fixtures_loader import load_mock_adf_inventory
 from src.migration.assessment import ADFCompatibilityAssessment
 from src.migration.deployment import (
     DeploymentService,
-    RealModeNotImplementedError,
+    FabricDeploymentDisabledError,
 )
 from src.migration.discovery import ADFDiscoveryService
 from src.migration.plan_store import save_plan
@@ -99,9 +99,11 @@ def test_injected_failure_stops_later_artifacts(approved_plan):
     )
 
 
-def test_real_mode_remains_disabled(approved_plan):
+def test_real_mode_disabled_by_default(approved_plan):
+    # REAL is implemented in Phase 10 but stays disabled unless explicitly
+    # enabled + configured; requesting it otherwise is a hard, safe stop.
     record, approval = approved_plan
-    with pytest.raises(RealModeNotImplementedError):
+    with pytest.raises(FabricDeploymentDisabledError):
         DeploymentService().deploy(
             record["id"], approval.approval_id, DeploymentMode.REAL
         )

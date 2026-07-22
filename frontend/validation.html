@@ -9,18 +9,44 @@
   </style>
 </head>
 <body>
-  <h1>Artifact Structural Validation</h1>
+  <h1>Structural Migration Validation</h1>
   <p>Compares the persisted ADF source snapshot, approved generated package, manifest, and deployed mock definitions. Customer rows and business metrics are not part of structural migration status.</p>
   <section class="card"><h2>Latest deployment</h2><div id="deployment-meta">Loading…</div></section>
   <section class="card">
     <h2>Run structural validation</h2>
     <button id="btn-validate" disabled>Validate artifacts</button>
-    <button id="btn-runtime" disabled>Run optional runtime checks</button>
+    <button id="btn-runtime" disabled>Run optional runtime checks (metrics only)</button>
     <div id="msg" role="status"></div>
   </section>
   <section id="results" class="card" hidden>
     <h2>Structural coverage</h2><div id="val-summary"></div><div id="reports"></div>
     <table><thead><tr><th>Category</th><th>Status</th><th>Source</th><th>Target artifact</th><th>Result</th></tr></thead><tbody id="val-checks"></tbody></table>
+  </section>
+
+  <h1>Optional Runtime Validation</h1>
+  <p><strong>Structural status above is never changed by anything in this section.</strong> This runs the actual migrated pipeline in both ADF and Fabric (when explicitly enabled and configured) and optionally compares safe runtime metrics — row counts, schemas, numeric/grouped totals, duration. It is strictly additive.</p>
+  <section class="card">
+    <h2>Readiness</h2>
+    <div id="exec-readiness">Loading…</div>
+  </section>
+  <section class="card">
+    <h2>Controlled execution</h2>
+    <button id="btn-start-source" disabled>Start source (ADF) execution</button>
+    <span style="margin:0 8px">|</span>
+    <label>Plan id <input id="in-target-plan" type="number" style="width:80px"></label>
+    <label>Deployment id <input id="in-target-deployment" type="number" style="width:80px"></label>
+    <button id="btn-start-target" disabled>Start target (Fabric) execution</button>
+    <div id="exec-msg" role="status"></div>
+    <table><thead><tr><th>Execution</th><th>Side</th><th>Pipeline</th><th>Status</th><th>Run id</th><th>Duration (s)</th></tr></thead><tbody id="exec-history"></tbody></table>
+  </section>
+  <section class="card">
+    <h2>Runtime-equivalence comparison</h2>
+    <label>Source execution id <input id="in-source-exec" type="number"></label>
+    <label>Target execution id <input id="in-target-exec" type="number"></label>
+    <button id="btn-run-runtime-validation">Compare source vs. target</button>
+    <div id="runtime-val-msg" role="status"></div>
+    <div id="runtime-val-summary"></div>
+    <table><thead><tr><th>Check</th><th>Status</th><th>Source</th><th>Target</th><th>Tolerance</th><th>Explanation</th></tr></thead><tbody id="runtime-val-checks"></tbody></table>
   </section>
   <script src="/validation.js"></script>
 </body>

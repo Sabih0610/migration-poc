@@ -16,6 +16,9 @@ from src.migration.discovery_store import get_discovery
 from src.migration.assessment_store import get_assessment
 from src.migration.plan_store import get_plan
 from src.models.schemas import MigrationReport
+from src.validation.runtime_execution_validation_store import (
+    get_latest_runtime_execution_validation,
+)
 from src.validation.runtime_store import get_latest_runtime_validation
 from src.validation.structural_store import get_structural_validation
 
@@ -102,6 +105,15 @@ def generate_report(validation_id: int, reports_dir: Path | None = None) -> Migr
     if runtime and runtime.deployment_id != validation.deployment_id:
         runtime = None
 
+    # Optional Phase 11 runtime-equivalence (execution-linked) appendix.
+    # Only included when a runtime validation exists for this plan. Matched
+    # by plan id, not deployment id: structural validation always runs
+    # against a MOCK deployment while a Phase 11 runtime validation is
+    # linked to a separate REAL deployment of the same plan.
+    runtime_execution_validation = get_latest_runtime_execution_validation(
+        plan_id=validation.plan_id
+    )
+
     report = MigrationReport(
         report_id=f"structural-{validation_id}",
         generated_at=datetime.now(timezone.utc).isoformat(),
@@ -156,6 +168,7 @@ def generate_report(validation_id: int, reports_dir: Path | None = None) -> Migr
         deployment=redact_secrets(deployment_record["result"]),
         structural_validation=validation,
         runtime_validation=redact_secrets(runtime),
+        runtime_execution_validation=redact_secrets(runtime_execution_validation),
     )
     root = Path(reports_dir).resolve() if reports_dir else get_reports_dir()
     root.mkdir(parents=True, exist_ok=True)
@@ -238,6 +251,29 @@ def _render_html(report: MigrationReport) -> str:
                      if key in {"status", "requested_by", "decided_by", "request_comment", "decision_comment", "plan_fingerprint"}]
     stage_rows = [[name, stage.get("status") or stage.get("overall_status") or "captured"]
                   for name, stage in report.workflow_stages.items()]
+    runtime_appendix = ""
+    rev = report.runtime_execution_validation
+    if rev:
+        runtime_check_rows = [
+            [c.get("name"), c.get("status"), c.get("source_value"), c.get("target_value"),
+             c.get("tolerance"), c.get("explanation")]
+            for c in rev.get("checks", [])
+        ]
+        summary = rev.get("summary", {}) or {}
+        runtime_appendix = "".join([
+            "<h2>Optional runtime-equivalence validation (appendix)</h2>",
+            "<p><strong>This section never alters the structural validation status above.</strong> "
+            "It compares safe runtime metrics from a real, controlled source (ADF) execution and a "
+            "real, controlled target (Fabric) execution of the same migrated pipeline.</p>",
+            f"<p>Runtime status: {_e(rev.get('status'))} — "
+            f"{summary.get('passed', 0)} passed, {summary.get('warnings', 0)} warnings, "
+            f"{summary.get('failed', 0)} failed, {summary.get('inconclusive', 0)} inconclusive "
+            f"({summary.get('total_checks', 0)} checks).</p>",
+            f"<p>Source execution: {_e(rev.get('source_execution_id'))} (run {_e(rev.get('source_run_id'))}) — "
+            f"Target execution: {_e(rev.get('target_execution_id'))} (run {_e(rev.get('target_run_id'))}) — "
+            f"Correlation: <code>{_e(rev.get('correlation_id'))}</code></p>",
+            _table(["Check", "Status", "Source", "Target", "Tolerance", "Explanation"], runtime_check_rows),
+        ])
     return "".join([
         "<!doctype html><html><head><meta charset=\"utf-8\"><title>Artifact Migration Report</title>",
         "<style>body{font-family:Arial,sans-serif;margin:2rem;color:#182230}table{border-collapse:collapse;width:100%;margin-bottom:1.5rem}th,td{border:1px solid #ccd5df;padding:.45rem;text-align:left;vertical-align:top}th{background:#eef3f8}code{overflow-wrap:anywhere}</style></head><body>",
@@ -255,5 +291,6 @@ def _render_html(report: MigrationReport) -> str:
         "<h2>Structural validation</h2>", _table(["Category", "Status", "Source", "Target", "Result"], check_rows),
         "<h2>Unsupported properties</h2>", _table(["Artifact", "Property"], [[i.get("artifact_id"), i.get("property")] for i in report.unsupported_properties]),
         "<h2>Manual actions</h2>", _table(["Artifact/source", "Action"], [[i.get("artifact_id") or i.get("source_asset"), i.get("action") or i.get("recommended_action")] for i in report.manual_actions]),
+        runtime_appendix,
         "</body></html>",
     ])

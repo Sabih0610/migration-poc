@@ -56,3 +56,43 @@ def get_latest_structural_validation() -> Optional[StructuralValidationResult]:
         return _to_result(record) if record else None
     finally:
         session.close()
+
+
+def get_latest_structural_validation_for_deployment(
+    deployment_id: int,
+) -> Optional[StructuralValidationResult]:
+    """Return the most recent structural validation run for a deployment."""
+    session = get_session_factory()()
+    try:
+        record = (
+            session.query(StructuralValidationRunRecord)
+            .filter(StructuralValidationRunRecord.deployment_id == deployment_id)
+            .order_by(StructuralValidationRunRecord.id.desc())
+            .first()
+        )
+        return _to_result(record) if record else None
+    finally:
+        session.close()
+
+
+def get_latest_structural_validation_for_plan(
+    plan_id: int,
+) -> Optional[StructuralValidationResult]:
+    """Return the most recent structural validation run for a plan.
+
+    Structural validation always runs against a MOCK deployment (see
+    ``StructuralValidationService``), while a Phase 11 controlled
+    execution runs against a separate REAL deployment of the same plan —
+    so gating execution requires matching by plan, not deployment id.
+    """
+    session = get_session_factory()()
+    try:
+        record = (
+            session.query(StructuralValidationRunRecord)
+            .filter(StructuralValidationRunRecord.plan_id == plan_id)
+            .order_by(StructuralValidationRunRecord.id.desc())
+            .first()
+        )
+        return _to_result(record) if record else None
+    finally:
+        session.close()

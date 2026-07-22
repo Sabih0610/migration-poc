@@ -20,6 +20,7 @@ from src.api.approval_routes import router as approval_router
 from src.api.deployment_routes import router as deployment_router
 from src.api.validation_routes import router as validation_router
 from src.api.azure_routes import router as azure_router
+from src.api.execution_routes import router as execution_router
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,7 @@ app.include_router(approval_router)
 app.include_router(deployment_router)
 app.include_router(validation_router)
 app.include_router(azure_router)
+app.include_router(execution_router)
 
 
 # ── Exception handler ────────────────────────────────────────────

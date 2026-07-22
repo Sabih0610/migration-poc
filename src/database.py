@@ -231,6 +231,124 @@ class RuntimeValidationRunRecord(Base):
     )
     completed_at = Column(DateTime, nullable=True)
 
+
+class PipelineExecutionRecord(Base):
+    """Persisted controlled source/target pipeline execution (Phase 11).
+
+    Stores only safe run metadata — there is deliberately no free-form
+    "data"/"payload" column, so customer row content can never be
+    persisted through this table.
+    """
+
+    __tablename__ = "pipeline_executions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    correlation_id = Column(String(64), nullable=False, index=True)
+    side = Column(String(16), nullable=False)  # "source" | "target"
+    pipeline_identity = Column(String(255), nullable=False)
+    run_id = Column(String(255), nullable=True)
+    plan_id = Column(Integer, nullable=True)
+    deployment_id = Column(Integer, nullable=True)
+    discovery_snapshot_id = Column(Integer, nullable=True)
+    status = Column(String(32), nullable=False)
+    safe_error_category = Column(String(64), nullable=True)
+    metrics_json = Column(Text, nullable=True)
+    started_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    completed_at = Column(DateTime, nullable=True)
+    duration_seconds = Column(Integer, nullable=True)
+
+    def __repr__(self) -> str:
+        return (
+            f"<PipelineExecutionRecord(id={self.id}, side={self.side!r}, "
+            f"pipeline_identity={self.pipeline_identity!r}, status={self.status!r})>"
+        )
+
+
+class RuntimeExecutionValidationRecord(Base):
+    """Persisted execution-linked runtime-equivalence validation (Phase 11).
+
+    Distinct from ``runtime_validation_runs`` (Phase 8's metrics-only
+    comparison): every row here references a real source and target
+    pipeline execution, not just externally-supplied metrics.
+    """
+
+    __tablename__ = "runtime_execution_validations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    plan_id = Column(Integer, nullable=False)
+    deployment_id = Column(Integer, nullable=False)
+    correlation_id = Column(String(64), nullable=False, index=True)
+    status = Column(String(32), nullable=False)
+    result_json = Column(Text, nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    completed_at = Column(DateTime, nullable=True)
+
+    def __repr__(self) -> str:
+        return (
+            f"<RuntimeExecutionValidationRecord(id={self.id}, "
+            f"plan_id={self.plan_id}, status={self.status!r})>"
+        )
+
+class McpAuditLogRecord(Base):
+    """Persisted audit row for one MCP tool call (Phase 12).
+
+    One row per tool invocation. Never stores credentials, tokens, raw
+    SDK exceptions, customer row content, or unbounded definitions — only
+    a bounded, redacted summary of the call. Survives process restart:
+    same SQLite database file used by every other store in this codebase.
+    """
+
+    __tablename__ = "mcp_audit_log"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    correlation_id = Column(String(64), nullable=False, index=True)
+    tool_name = Column(String(128), nullable=False, index=True)
+    permission_category = Column(String(32), nullable=False)
+    safe_input_summary = Column(Text, nullable=True)
+    referenced_ids_json = Column(Text, nullable=True)
+    authorization_result = Column(String(32), nullable=False)
+    result_status = Column(String(32), nullable=False)
+    duration_ms = Column(Integer, nullable=True)
+    safe_error_category = Column(String(64), nullable=True)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<McpAuditLogRecord(id={self.id}, tool_name={self.tool_name!r}, "
+            f"result_status={self.result_status!r})>"
+        )
+
+
+class McpOperationLockRecord(Base):
+    """Advisory concurrency lock for guarded/state-changing MCP operations
+    (Phase 12). A unique (operation, lock_key) row acts as a mutex: a
+    second concurrent call for the same operation + resource key fails
+    the unique constraint and is rejected as "already in progress" rather
+    than silently duplicating the underlying action. Rows are deleted
+    once the guarded operation completes (success or failure).
+    """
+
+    __tablename__ = "mcp_operation_locks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    operation = Column(String(64), nullable=False)
+    lock_key = Column(String(128), nullable=False)
+    correlation_id = Column(String(64), nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint("operation", "lock_key", name="uq_mcp_operation_lock"),
+    )
+
+
 # ── Engine & Session ─────────────────────────────────────────────
 
 _engine = None
